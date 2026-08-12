@@ -1,6 +1,6 @@
 # PF2E Aura Forge
 
-Aura Forge is the aura-definition and management layer for the Forge Suite. Version 0.2.1 polishes **Actor Assignment & Aura Instances** with Actor Directory drag-and-drop and sheet-visible PF2e passive abilities.
+Aura Forge is the aura-definition and management layer for the Forge Suite. Version 0.2.4 polishes **Actor Assignment & Aura Instances** and keeps the clearly framed Aura Editor domains fully scrollable even when their combined content is taller than the window.
 
 ## Included
 
@@ -18,6 +18,7 @@ Aura Forge is the aura-definition and management layer for the Forge Suite. Vers
 - Deleting an Aura Definition removes its Actor references to avoid orphaned assignments.
 - Additive public `api.instances` contract for other Forge modules, including reconciliation and definition-sync helpers.
 - Pure presence reconciliation planning remains available for the later runtime engine.
+- Basic data, targeting, Actor assignments, presence effects, and event triggers are visually separated by stronger section frames and icon title rails.
 
 ## Definition vs. instance
 

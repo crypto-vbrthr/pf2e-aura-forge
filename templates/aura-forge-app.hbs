@@ -35,8 +35,10 @@
     </header>
 
     <div class="aura-forge-scroll" data-aura-fields data-preserve-scroll data-scroll-key="main">
-      <section class="aura-forge-section">
-        <h2>{{localize "PF2E_AURA_FORGE.BasicData"}}</h2>
+      <section class="aura-forge-section aura-editor-group group-basic-data">
+        <header class="section-header section-titlebar">
+          <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-sliders"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.BasicData"}}</h2></div></div>
+        </header>
         <div class="aura-forge-grid two-columns">
           <label><span>{{localize "PF2E_AURA_FORGE.Name"}}</span><input name="auraName" type="text" value="{{draft.name}}" required></label>
           <label><span>{{localize "PF2E_AURA_FORGE.Radius"}}</span><input name="auraRadius" type="number" min="1" step="5" value="{{draft.radius}}"></label>
@@ -46,8 +48,10 @@
         <label class="full-width"><span>{{localize "PF2E_AURA_FORGE.Description"}}</span><textarea name="auraDescription" rows="3">{{draft.description}}</textarea></label>
       </section>
 
-      <section class="aura-forge-section">
-        <h2>{{localize "PF2E_AURA_FORGE.Targeting"}}</h2>
+      <section class="aura-forge-section aura-editor-group group-targeting">
+        <header class="section-header section-titlebar">
+          <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-crosshairs"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.Targeting"}}</h2></div></div>
+        </header>
         <div class="aura-forge-target-grid">
           <label class="checkbox-row"><input name="target-allies" type="checkbox" {{#if draft.targeting.allies}}checked{{/if}}><span>{{localize "PF2E_AURA_FORGE.Allies"}}</span></label>
           <label class="checkbox-row"><input name="target-enemies" type="checkbox" {{#if draft.targeting.enemies}}checked{{/if}}><span>{{localize "PF2E_AURA_FORGE.Enemies"}}</span></label>
@@ -60,9 +64,9 @@
         </div>
       </section>
 
-      <section class="aura-forge-section actor-assignment-section" data-instance-controls>
-        <header class="section-header">
-          <div><h2>{{localize "PF2E_AURA_FORGE.ActorAssignment"}}</h2><p>{{localize "PF2E_AURA_FORGE.ActorAssignmentHint"}}</p></div>
+      <section class="aura-forge-section aura-editor-group group-actor-assignment actor-assignment-section" data-instance-controls>
+        <header class="section-header section-titlebar">
+          <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-users-gear"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.ActorAssignment"}}</h2><p>{{localize "PF2E_AURA_FORGE.ActorAssignmentHint"}}</p></div></div>
         </header>
         {{#if selectedAuraId}}
           <div class="actor-assignment-controls">
@@ -102,9 +106,9 @@
         {{/if}}
       </section>
 
-      <section class="aura-forge-section">
-        <header class="section-header">
-          <div><h2>{{localize "PF2E_AURA_FORGE.PresenceEffects"}}</h2><p>{{localize "PF2E_AURA_FORGE.PresenceEffectsHint"}}</p></div>
+      <section class="aura-forge-section aura-editor-group group-presence-effects">
+        <header class="section-header section-titlebar">
+          <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-circle-nodes"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.PresenceEffects"}}</h2><p>{{localize "PF2E_AURA_FORGE.PresenceEffectsHint"}}</p></div></div>
           <button type="button" data-action="addPresenceEffect"><i class="fa-solid fa-plus"></i> {{localize "PF2E_AURA_FORGE.AddPresenceEffect"}}</button>
         </header>
         <div class="aura-card-list">
@@ -133,9 +137,9 @@
         </div>
       </section>
 
-      <section class="aura-forge-section">
-        <header class="section-header">
-          <div><h2>{{localize "PF2E_AURA_FORGE.Triggers"}}</h2><p>{{localize "PF2E_AURA_FORGE.TriggersHint"}}</p></div>
+      <section class="aura-forge-section aura-editor-group group-triggers">
+        <header class="section-header section-titlebar">
+          <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-bolt"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.Triggers"}}</h2><p>{{localize "PF2E_AURA_FORGE.TriggersHint"}}</p></div></div>
           <button type="button" data-action="addTrigger"><i class="fa-solid fa-plus"></i> {{localize "PF2E_AURA_FORGE.AddTrigger"}}</button>
         </header>
         <div class="aura-card-list">
@@ -197,8 +201,10 @@
       </section>
 
       {{#if validation}}
-        <section class="aura-forge-section validation-section">
-          <h2>{{localize "PF2E_AURA_FORGE.Validation"}}</h2>
+        <section class="aura-forge-section aura-editor-group group-validation validation-section">
+          <header class="section-header section-titlebar">
+            <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-triangle-exclamation"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.Validation"}}</h2></div></div>
+          </header>
           {{#if hasValidationErrors}}<div class="validation-errors">{{#each validation.errors as |entry|}}<p><i class="fa-solid fa-circle-xmark"></i> {{entry.message}} <code>{{entry.path}}</code></p>{{/each}}</div>{{/if}}
           {{#if hasValidationWarnings}}<div class="validation-warnings">{{#each validation.warnings as |entry|}}<p><i class="fa-solid fa-triangle-exclamation"></i> {{entry.message}} <code>{{entry.path}}</code></p>{{/each}}</div>{{/if}}
         </section>

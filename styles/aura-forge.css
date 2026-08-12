@@ -6,12 +6,94 @@
 .aura-forge-library-list { display: flex; flex-direction: column; gap: .35rem; overflow: auto; }
 .aura-library-entry { display: flex; gap: .5rem; align-items: center; text-align: left; width: 100%; }
 .aura-library-entry.selected { outline: 2px solid var(--color-border-highlight); }
-.aura-forge-main { display: grid; grid-template-rows: auto minmax(0,1fr) auto; min-width: 0; min-height: 0; }
+.aura-forge-main { display: grid; grid-template-rows: auto minmax(0,1fr) auto; min-width: 0; min-height: 0; overflow: hidden; }
 .aura-forge-toolbar,.aura-forge-footer { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 1rem; border-bottom:1px solid var(--color-border-light-2); }
 .aura-forge-footer { border-top:1px solid var(--color-border-light-2); border-bottom:0; }
 .aura-forge-footer>div { display:flex; gap:.5rem; flex-wrap:wrap; }
-.aura-forge-scroll { overflow:auto; padding:1rem; display:grid; gap:1rem; }
-.aura-forge-section { border:1px solid var(--color-border-light-2); border-radius:8px; padding:1rem; display:grid; gap:.8rem; }
+.aura-forge-scroll {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 1rem;
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 1rem;
+}
+
+/* Theme-safe frame colors. Foundry's old --color-border-light-* variables are
+ * not guaranteed to exist in every V14 theme, so the major editor domains use
+ * currentColor-based colors with Foundry warm/accent variables only as accents. */
+.pf2e-aura-forge {
+  --aura-frame-border: color-mix(in srgb, currentColor 34%, transparent);
+  --aura-frame-divider: color-mix(in srgb, currentColor 24%, transparent);
+  --aura-frame-fill: color-mix(in srgb, currentColor 3%, transparent);
+  --aura-frame-title-fill: color-mix(in srgb, currentColor 7%, transparent);
+  --aura-frame-accent: var(--color-warm-2, var(--color-border-highlight, #b37a35));
+}
+.aura-forge-section {
+  border: 1px solid rgba(96,86,74,.55);
+  border-color: var(--aura-frame-border, rgba(96,86,74,.55));
+  border-radius: 8px;
+  padding: 1rem;
+  display: grid;
+  gap: .8rem;
+}
+
+/* Clear visual grouping for the main Aura Editor domains.
+ * These frames are intentionally stronger than ordinary field/card borders so
+ * Basic Data, Targets, Actor Assignments, Presence Effects, and Event Effects
+ * read as five separate work areas at a glance. */
+.aura-editor-group {
+  border: 2px solid rgba(96,86,74,.58);
+  border-color: var(--aura-frame-border, rgba(96,86,74,.58));
+  border-left: 5px solid var(--aura-frame-accent, #b37a35);
+  border-radius: 10px;
+  background: rgba(127,127,127,.035);
+  background: var(--aura-frame-fill, rgba(127,127,127,.035));
+  box-shadow: 0 2px 6px rgba(0,0,0,.14), inset 0 0 0 1px rgba(255,255,255,.025);
+  /* Do not make the group a clipping container. Grid items with clipped
+   * overflow may collapse below their contents inside the fixed-height editor
+   * pane, which hides fields instead of letting the parent pane scroll. */
+  overflow: visible;
+}
+.aura-editor-group > .section-titlebar {
+  align-items: center;
+  margin: -1rem -1rem 0;
+  padding: .7rem .85rem;
+  border-bottom: 1px solid rgba(96,86,74,.45);
+  border-bottom-color: var(--aura-frame-divider, rgba(96,86,74,.45));
+  background: rgba(127,127,127,.075);
+  background: var(--aura-frame-title-fill, rgba(127,127,127,.075));
+  border-radius: 8px 8px 0 0;
+}
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+  min-width: 0;
+}
+.section-heading-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 2rem;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 50%;
+  background: rgba(127,127,127,.08);
+}
+.section-heading > div { min-width: 0; }
+.section-heading h2 { line-height: 2rem; }
+.section-heading p { margin: .15rem 0 0; opacity: .75; }
+.group-basic-data .section-heading-icon { box-shadow: inset 0 0 0 1px rgba(127,127,127,.06); }
+.group-targeting .section-heading-icon { border-style: dashed; }
+.group-actor-assignment .section-heading-icon { border-radius: 7px; }
+.group-presence-effects .section-heading-icon { box-shadow: inset 0 0 0 2px rgba(127,127,127,.05); }
+.group-triggers .section-heading-icon { transform: rotate(-2deg); }
+.group-validation { border-left-color: var(--color-level-warning,#a66b00); }
 .aura-forge-section label { display:grid; gap:.25rem; }
 .aura-forge-grid { display:grid; gap:.75rem; }
 .aura-forge-grid.two-columns { grid-template-columns:repeat(2,minmax(0,1fr)); }

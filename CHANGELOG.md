@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.2.4
+
+### Aura Editor scrolling regression fix
+- Restored the main Aura Editor as an explicit vertical scroll container with stable scrollbar space.
+- Prevented CSS Grid from shrinking framed editor domains below their content height.
+- Removed clipping from the major editor group frames so fields and embedded Effect Editor content remain visible.
+- Preserved the rounded framed title rails without relying on section-level overflow clipping.
+- Added regression coverage for the scroll-layout contract.
+
+## 0.2.3
+
+### Theme-safe editor frames
+- Strengthened the major Aura Editor frames with theme-safe border fallbacks and a visible accent rail.
+- Avoided reliance on legacy Foundry border variables for the primary editor grouping.
+
+## 0.2.2
+
+### Aura Editor visual grouping
+- Added stronger framed editor domains for basic data, targeting, Actor assignments, presence effects, and event triggers.
+- Added consistent title rails with dedicated icons so the major Aura Editor areas can be recognized at a glance.
+- Kept the styling within Foundry's existing palette and left the embedded Effect Editor theme untouched.
+- Added regression coverage for the semantic section classes and shared visual-grouping styles.
+
 ## 0.2.1
 
 ### Actor Assignment polish
