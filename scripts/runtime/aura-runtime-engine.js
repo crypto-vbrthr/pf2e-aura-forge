@@ -40,10 +40,15 @@ function uniqueActors(scene, gameRef) {
   return [...byUuid.values()];
 }
 
+function sameUser(a, b) {
+  return Boolean(a && b && String(a.id ?? a._id ?? "") !== ""
+    && String(a.id ?? a._id) === String(b.id ?? b._id));
+}
+
 function canUpdateActor(actor, gameRef) {
   const user = gameRef?.user;
   if (!user || !actor) return false;
-  if (actor.primaryUpdater) return actor.primaryUpdater === user;
+  if (actor.primaryUpdater) return sameUser(actor.primaryUpdater, user);
   // If PF2e cannot provide a primaryUpdater, fall back to the single Aura
   // Forge runtime coordinator. This avoids two connected clients racing to
   // create the same presence Item.
@@ -317,6 +322,23 @@ export class AuraRuntimeEngine {
       };
     }
 
+    // Runtime mutations are owned by exactly one client per target Actor.
+    // With an active GM this is normally the GM (PF2e primaryUpdater); without
+    // one it naturally falls back to the assigned/owning player. This avoids
+    // duplicate side effects while still allowing no-GM sessions to function.
+    if (!canUpdateActor(targetActor, this.gameRef)) {
+      return {
+        applied: 0,
+        deferred: 0,
+        savesResolved: 0,
+        savesCancelled: 0,
+        saveErrors: [],
+        immunityApplied: 0,
+        immunitySkipped: 0,
+        immunityErrors: []
+      };
+    }
+
     let applied = 0;
     let deferred = 0;
     let savesResolved = 0;
@@ -326,18 +348,30 @@ export class AuraRuntimeEngine {
     const saveErrors = [];
     const immunityErrors = [];
 
-    if (canUpdateActor(targetActor, this.gameRef)) {
-      try { await this.immunities.cleanupExpired(targetActor); }
-      catch (error) { immunityErrors.push({ triggerId: null, status: "cleanup-error", error }); }
+    try { await this.immunities.cleanupExpired(targetActor); }
+    catch (error) { immunityErrors.push({ triggerId: null, status: "cleanup-error", error }); }
+
+    const matchingTriggers = (emitter.aura.triggers ?? []).filter((trigger) => trigger?.event === event);
+    // Immunity that already exists when this event starts blocks the event. An
+    // immunity granted by one trigger during this same event does not cancel
+    // sibling triggers that are part of the same aura occurrence; it takes
+    // effect for subsequent aura events and for the post-event Presence pass.
+    const blockedAtEventStart = this.immunities.hasForEmitter(targetActor, emitter);
+    if (blockedAtEventStart) {
+      immunitySkipped += matchingTriggers.length;
+      return {
+        applied,
+        deferred,
+        savesResolved,
+        savesCancelled,
+        saveErrors,
+        immunityApplied,
+        immunitySkipped,
+        immunityErrors
+      };
     }
 
-    for (const trigger of emitter.aura.triggers ?? []) {
-      if (trigger?.event !== event) continue;
-
-      if (this.immunities.hasForEmitter(targetActor, emitter)) {
-        immunitySkipped += 1;
-        continue;
-      }
+    for (const trigger of matchingTriggers) {
 
       if (trigger.save?.enabled) {
         let result = null;
@@ -346,6 +380,7 @@ export class AuraRuntimeEngine {
             targetActor,
             targetToken,
             sourceActor: emitter.sourceActor,
+            sourceToken: emitter.sourceToken,
             trigger,
             aura: emitter.aura
           };
@@ -375,7 +410,6 @@ export class AuraRuntimeEngine {
         continue;
       }
 
-      if (!canUpdateActor(targetActor, this.gameRef)) continue;
       // Without a saving throw, the success slot is the canonical direct outcome.
       try {
         applied += await this.#applyTriggerOutcome(emitter, trigger, targetToken, event, "success");
@@ -426,13 +460,9 @@ export class AuraRuntimeEngine {
       // second reconciliation cannot request the same transition twice.
       this.occupancy.set(emitter.key, new Set(current));
 
-      // Exactly one client coordinates transition side effects. Remote player
-      // save dialogs are explicitly routed over the module socket from there.
-      if (!isRuntimeCoordinator(this.gameRef)) continue;
-
       for (const tokenId of transitions.entered) {
         const token = tokenById(scene, tokenId);
-        if (!token) continue;
+        if (!token?.actor || !canUpdateActor(token.actor, this.gameRef)) continue;
         const result = await this.#runTrigger(emitter, token, "enter");
         triggerEffects += result.applied;
         deferredSaves += result.deferred;
@@ -445,7 +475,7 @@ export class AuraRuntimeEngine {
       }
       for (const tokenId of transitions.left) {
         const token = tokenById(scene, tokenId);
-        if (!token) continue;
+        if (!token?.actor || !canUpdateActor(token.actor, this.gameRef)) continue;
         const result = await this.#runTrigger(emitter, token, "leave");
         triggerEffects += result.applied;
         deferredSaves += result.deferred;
@@ -503,7 +533,11 @@ export class AuraRuntimeEngine {
   }
 
   #claimCombatEvent(combat, event, state = {}) {
-    const key = [combat?.id ?? "combat", event, state?.round ?? "", state?.turn ?? "", state?.tokenId ?? ""]
+    // Combatant identity is more stable than a turn index. Initiative order can
+    // change during a round, which would otherwise make the same combatant look
+    // like a new event merely because its array position changed.
+    const subject = state?.tokenId ?? state?.combatantId ?? `turn-${state?.turn ?? ""}`;
+    const key = [combat?.id ?? "combat", event, state?.round ?? "", subject]
       .map((value) => String(value ?? ""))
       .join("::");
     if (this.processedCombatEvents.has(key)) return false;
@@ -513,6 +547,13 @@ export class AuraRuntimeEngine {
       if (oldest) this.processedCombatEvents.delete(oldest);
     }
     return true;
+  }
+
+  resetCombat(combatId) {
+    const prefix = `${String(combatId ?? "combat")}::`;
+    for (const key of [...this.processedCombatEvents]) {
+      if (key.startsWith(prefix)) this.processedCombatEvents.delete(key);
+    }
   }
 
   async #runTurnEvent(scene, tokenId, event) {
@@ -528,9 +569,9 @@ export class AuraRuntimeEngine {
       immunitySkipped: 0,
       immunityErrors: []
     };
-    if (!scene?.id || !tokenId || !isRuntimeCoordinator(this.gameRef)) return report;
+    if (!scene?.id || !tokenId) return report;
     const targetToken = tokenById(scene, tokenId);
-    if (!targetToken?.actor) return report;
+    if (!targetToken?.actor || !canUpdateActor(targetToken.actor, this.gameRef)) return report;
 
     const emitters = await this.#emitters(scene);
     for (const emitter of emitters) {
@@ -585,7 +626,10 @@ export class AuraRuntimeEngine {
 
   async handleCombatStart(combat, updateData = {}) {
     const scene = combat?.scene ?? this.gameRef?.scenes?.get?.(combat?.scene?.id ?? combat?.sceneId) ?? globalThis.canvas?.scene ?? null;
-    if (!scene?.id || !isRuntimeCoordinator(this.gameRef)) return null;
+    if (!scene?.id) return null;
+    // A Combat document can be reset and started again without changing its ID.
+    // Clear claims from the previous run so round-one events are eligible again.
+    this.resetCombat(combat?.id);
     const turnIndex = Number(updateData?.turn ?? combat?.turn ?? 0);
     const turns = combat?.turns?.contents ?? combat?.turns ?? [];
     const combatant = turns?.[turnIndex] ?? combat?.combatant ?? null;

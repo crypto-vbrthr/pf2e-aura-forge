@@ -1,22 +1,33 @@
 # Changelog
 
+## 0.4.3
+
+### Runtime Review & Edge-Case Hardening
+- Moved enter/leave and turn-event side-effect ownership from a single global coordinator to the target Actor's PF2e `primaryUpdater`, with the deterministic Aura Forge coordinator retained only as a fallback when PF2e provides no updater. This keeps single-writer behavior while allowing no-GM/player-owned sessions to execute aura events correctly.
+- User ownership comparison now uses stable User IDs rather than JavaScript object identity.
+- Immunity is snapshotted at the start of an aura event: pre-existing immunity blocks the event, but immunity granted by one trigger no longer cancels sibling triggers from that same already-started event. It takes effect for subsequent events and the post-event Presence reconciliation.
+- Combat-event deduplication now keys on stable token/combatant identity instead of mutable turn indexes, preventing initiative reordering from replaying turn-start/turn-end effects.
+- Combat claims are reset on a new `combatStart` for the same Combat document and cleared on `deleteCombat`, so reset/reused combats cannot inherit stale event history.
+- Canvas teardown now cancels queued reconciliation and rejects late movement-animation scheduling for the departed scene, preventing Presence Effects from being reapplied after teardown.
+- Remote saving throws now prefer token-scoped synthetic Actors for both target and origin, preserving unlinked-token data instead of accidentally resolving against same-ID world Actors.
+- Added overlap/source-removal, no-GM ownership, sibling-trigger immunity, combat restart/reorder, teardown race, combat cleanup, and synthetic-token socket regression coverage.
+
 ## 0.4.2
 
 ### Presence / Immunity Reconciliation Hardening
-- Established the runtime ordering contract: discrete aura events resolve completely before continuous Presence Effects are reconciled.
-- Turn-start and turn-end events now reconcile Presence Effects immediately after their outcomes and temporary-immunity changes. A newly granted presence-blocking immunity therefore removes an already active Presence Effect in the same turn event.
-- Presence reconciliation now cleans expired managed immunity Effects before calculating desired Presence state. If an immunity expires while the target remains in the aura, the Presence Effect is restored automatically.
-- Added Foundry world-time reconciliation so minute/hour/day fallback expiry does not require token movement or another aura event.
-- Added managed-immunity Item create/update/delete hooks so PF2e effect expiry/removal immediately refreshes Presence state, including round-based immunity cleanup.
-- Added an editor hint explaining that presence-blocking immunity removes Presence Effects immediately and allows them to return after immunity expires while the target remains inside.
-- Added regression coverage for later turn-bound immunity removing existing Presence Effects, expiry restoring Presence, world-time refresh, managed-immunity Item changes, and the editor interaction hint.
+- Formalized event ordering as event → save → outcome → immunity → Presence reconciliation.
+- Presence-blocking immunity granted on enter prevents Presence creation; immunity granted later removes active Presence immediately.
+- Expired or manually removed immunity restores Presence while the target remains inside the aura.
+- World-time and managed immunity Item changes trigger presence-only reconciliation.
+- Added editor guidance for Presence Effects combined with Presence-blocking immunity.
 
 ## 0.4.1
 
-### Combat and Presence Hardening
-- Added a Combat update fallback alongside `combatTurnChange` and improved combatant/token reconstruction for turn-start and turn-end events.
-- Serialized scene reconciliation to prevent duplicate Presence Effect creation from overlapping runtime hooks.
-- Temporary immunity can explicitly suppress Presence Effects, with suppression enabled by default while event-only immunity remains available as an opt-out.
+### Turn Runtime and Presence Ownership Fixes
+- Added a generic Combat-update fallback for turnStart/turnEnd handling and hardened token lookup from combat history.
+- Serialized scene reconciliation to prevent parallel Presence application races.
+- Added the `blocksPresence` temporary-immunity option, enabled by default, with immediate Presence suppression semantics.
+- Hardened single-client Presence mutations when PF2e cannot expose a primary updater.
 
 ## 0.4.0
 

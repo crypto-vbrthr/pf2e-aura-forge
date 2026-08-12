@@ -80,3 +80,74 @@ test("request-mode saves are routed from the GM coordinator to the active player
   gmService.destroy();
   playerService.destroy();
 });
+
+test("remote saves prefer token-scoped synthetic actors over same-id world actors", async () => {
+  const network = new SocketNetwork();
+  const gmSocket = network.endpoint();
+  const playerSocket = network.endpoint();
+  const gm = { id: "gm", isGM: true, active: true };
+  const player = { id: "player", isGM: false, active: true, character: { id: "target" } };
+  const users = usersCollection([gm, player], gm);
+
+  const worldTarget = { id: "target", marker: "world-target" };
+  const worldSource = { id: "source", marker: "world-source" };
+  const syntheticTarget = { id: "target", marker: "synthetic-target" };
+  const syntheticSource = { id: "source", marker: "synthetic-source" };
+  const targetToken = { id: "target-token", actor: syntheticTarget };
+  const sourceToken = { id: "source-token", actor: syntheticSource };
+  const scene = {
+    id: "scene",
+    tokens: {
+      get(id) {
+        if (id === targetToken.id) return targetToken;
+        if (id === sourceToken.id) return sourceToken;
+        return null;
+      }
+    }
+  };
+  targetToken.parent = sourceToken.parent = scene;
+
+  const playerRuntime = {
+    saveResolution: {
+      async roll({ targetActor, sourceActor }) {
+        assert.equal(targetActor.marker, "synthetic-target");
+        assert.equal(sourceActor.marker, "synthetic-source");
+        return { status: "resolved", degree: "success", saveType: "will", dc: 20 };
+      }
+    }
+  };
+  const gmRuntime = { saveResolution: { async roll() { throw new Error("GM should route this save"); } } };
+  const gmGame = { user: gm, users, socket: gmSocket };
+  const playerGame = {
+    user: player,
+    users,
+    socket: playerSocket,
+    actors: {
+      get(id) {
+        if (id === "target") return worldTarget;
+        if (id === "source") return worldSource;
+        return null;
+      }
+    },
+    scenes: { get: (id) => id === scene.id ? scene : null }
+  };
+
+  const gmService = new AuraRuntimeSocketService({ runtime: gmRuntime, gameRef: gmGame, socket: gmSocket, timeoutMs: 1000 });
+  const playerService = new AuraRuntimeSocketService({ runtime: playerRuntime, gameRef: playerGame, socket: playerSocket, timeoutMs: 1000 });
+  gmService.register();
+  playerService.register();
+
+  const result = await gmService.resolveSave({
+    targetActor: { id: "target" },
+    targetToken,
+    sourceActor: { id: "source" },
+    sourceToken,
+    trigger: { id: "enter", event: "enter", save: { enabled: true, type: "will", mode: "request", dc: { value: 20 } } },
+    aura: { id: "aura", name: "Aura" }
+  });
+
+  assert.equal(result.status, "resolved");
+  assert.equal(result.degree, "success");
+  gmService.destroy();
+  playerService.destroy();
+});

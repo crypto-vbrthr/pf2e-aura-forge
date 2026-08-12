@@ -46,7 +46,7 @@ export class AuraRuntimeSocketService {
     this.pending.clear();
   }
 
-  async resolveSave({ targetActor, targetToken, sourceActor, trigger, aura }) {
+  async resolveSave({ targetActor, targetToken, sourceActor, sourceToken = null, trigger, aura }) {
     const mode = trigger?.save?.mode ?? "request";
     const resolver = resolveSaveUser(targetActor, mode, this.gameRef);
     if (!resolver) return { status: "unavailable", degree: null, reason: "no-resolver" };
@@ -70,6 +70,7 @@ export class AuraRuntimeSocketService {
       targetActorId: targetActor?.id ?? null,
       targetTokenId: targetToken?.id ?? null,
       sourceActorId: sourceActor?.id ?? null,
+      sourceTokenId: sourceToken?.id ?? sourceActor?.token?.id ?? sourceActor?.parent?.id ?? null,
       trigger: structuredClone(trigger),
       aura: structuredClone(aura)
     };
@@ -103,9 +104,13 @@ export class AuraRuntimeSocketService {
     if (String(packet.resolverUserId ?? "") !== String(this.gameRef?.user?.id ?? "")) return;
 
     const scene = this.gameRef?.scenes?.get?.(packet.sceneId) ?? globalThis.canvas?.scene ?? null;
-    const targetActor = this.gameRef?.actors?.get?.(packet.targetActorId) ?? tokenById(scene, packet.targetTokenId)?.actor ?? null;
     const targetToken = tokenById(scene, packet.targetTokenId);
-    const sourceActor = this.gameRef?.actors?.get?.(packet.sourceActorId) ?? null;
+    const sourceToken = tokenById(scene, packet.sourceTokenId);
+    // Prefer token-scoped Actors so unlinked/synthetic tokens keep their own
+    // prepared data and token-specific overrides during remote saves. Falling
+    // back to the world Actor remains correct for linked/no-token contexts.
+    const targetActor = targetToken?.actor ?? this.gameRef?.actors?.get?.(packet.targetActorId) ?? null;
+    const sourceActor = sourceToken?.actor ?? this.gameRef?.actors?.get?.(packet.sourceActorId) ?? null;
 
     let result;
     try {

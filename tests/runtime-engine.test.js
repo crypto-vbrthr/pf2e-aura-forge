@@ -610,3 +610,121 @@ test("expired immunity is cleaned and presence returns while the target remains 
   assert.equal(targetActor.items.some((item) => item.flags?.["pf2e-aura-forge"]?.auraImmunity), false);
   assert.equal(presenceItems(targetActor).length, 1);
 });
+
+test("target primary updater owns transition side effects even when another player is the global fallback coordinator", async () => {
+  const state = setup();
+  const { runtime, scene, targetActor, targetToken, calls } = state;
+  const owner = { id: "player-z", isGM: false, active: true };
+  const other = { id: "player-a", isGM: false, active: true };
+  runtime.gameRef.user = owner;
+  runtime.gameRef.users = { contents: [other, owner] };
+  // Use a distinct object with the same id to verify identity is based on the
+  // stable User id rather than JS object identity.
+  targetActor.primaryUpdater = { id: "player-z", isGM: false, active: true };
+
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  targetToken.x = 200;
+  const report = await runtime.reconcileScene(scene, { fireEvents: true });
+
+  assert.equal(report.transitions.entered, 1);
+  assert.equal(calls.filter((call) => call.definition.id === "enter.effect").length, 1);
+});
+
+test("immunity granted by one trigger does not cancel sibling triggers from the same aura event", async () => {
+  const state = setup({
+    saveEnter: true,
+    saveDegree: 1,
+    enterImmunity: {
+      enabled: true,
+      blocksPresence: true,
+      duration: { value: 1, unit: "minutes" },
+      scope: "ability",
+      applyOn: ["failure"]
+    }
+  });
+  const { runtime, aura, scene, targetToken, calls } = state;
+  aura.triggers.push({
+    id: "trigger.enter.sibling",
+    name: "Sibling enter effect",
+    event: "enter",
+    save: { enabled: false },
+    outcomes: { success: effect("enter.sibling", "Sibling Enter") },
+    immunity: { enabled: false, applyOn: [] }
+  });
+
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  targetToken.x = 200;
+  const report = await runtime.reconcileScene(scene, { fireEvents: true });
+
+  assert.equal(report.transitions.immunityApplied, 1);
+  assert.equal(calls.filter((call) => call.definition.id === "enter.failure").length, 1);
+  assert.equal(calls.filter((call) => call.definition.id === "enter.sibling").length, 1);
+
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { fireEvents: true });
+  targetToken.x = 200;
+  const blocked = await runtime.reconcileScene(scene, { fireEvents: true });
+  assert.equal(blocked.transitions.immunitySkipped, 2);
+  assert.equal(calls.filter((call) => call.definition.id === "enter.sibling").length, 1);
+});
+
+test("overlapping emitters keep independent presence bindings and removing one source preserves the other", async () => {
+  const state = setup();
+  const { runtime, aura, scene, sourceActor, allyActor, sourceToken, allyToken, targetActor } = state;
+  const [instance] = runtime.actorAuras.list(sourceActor);
+  allyToken.x = 0;
+  runtime.actorAuras.list = (actor) => (actor === sourceActor || actor === allyActor ? [instance] : []);
+  runtime.actorAuras.resolve = async (actor, id) => {
+    if ((actor !== sourceActor && actor !== allyActor) || id !== instance.id) return null;
+    return { instance, definition: aura, resolved: structuredClone(aura), missingDefinition: false };
+  };
+
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  assert.equal(presenceItems(targetActor).length, 2);
+
+  const sourceIndex = scene.tokens.contents.indexOf(sourceToken);
+  scene.tokens.contents.splice(sourceIndex, 1);
+  const report = await runtime.reconcileScene(scene, { fireEvents: false });
+  assert.equal(report.presence.removed, 1);
+  assert.equal(presenceItems(targetActor).length, 1);
+});
+
+test("combat-start claims reset when the same Combat document is started for a new run", async () => {
+  const state = setup({ turnStart: true, saveDegree: 1 });
+  const { runtime, scene, targetToken, calls, saveCalls } = state;
+  const combat = { id: "combat.restart", scene, turns: [{ id: "target-combatant", tokenId: targetToken.id }] };
+
+  await runtime.handleCombatStart(combat, { round: 1, turn: 0 });
+  await runtime.handleCombatStart(combat, { round: 1, turn: 0 });
+
+  assert.equal(saveCalls.length, 2);
+  assert.equal(calls.filter((call) => call.definition.id === "turn-start.failure").length, 2);
+});
+
+test("combat-event deduplication follows token identity when initiative order changes", async () => {
+  const state = setup({ turnStart: true, saveDegree: 1 });
+  const { runtime, scene, targetToken, allyToken, saveCalls } = state;
+  const combat = {
+    id: "combat.reorder",
+    scene,
+    turns: [
+      { id: "target-combatant", tokenId: targetToken.id },
+      { id: "ally-combatant", tokenId: allyToken.id }
+    ]
+  };
+
+  await runtime.handleCombatStart(combat, { round: 1, turn: 0 });
+  assert.equal(saveCalls.length, 1);
+
+  // The same target appears at a different turn index after an initiative
+  // reorder. It must not receive a second turnStart for the same round.
+  const report = await runtime.handleCombatTurnChange(
+    combat,
+    { round: 1, turn: 1, tokenId: allyToken.id },
+    { round: 1, turn: 2, tokenId: targetToken.id }
+  );
+  assert.equal(report.turnStart, null);
+  assert.equal(saveCalls.length, 1);
+});

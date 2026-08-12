@@ -65,14 +65,22 @@ export function registerAuraRuntimeHooks(runtime, {
   const registrations = [];
   const timers = new Map();
   const pending = new Map();
+  const inactiveScenes = new Set();
   let activeScene = currentScene(canvasRef);
   const combatStates = new Map();
   for (const combat of collectionContents(gameRef?.combats)) {
     if (combat?.id) combatStates.set(combat.id, combatState(combat));
   }
 
+  const cancelScheduled = (sceneId) => {
+    if (!sceneId) return;
+    globalThis.clearTimeout(timers.get(sceneId));
+    timers.delete(sceneId);
+    pending.delete(sceneId);
+  };
+
   const schedule = (scene, { fireEvents = false, seed = false, presenceOnly = false } = {}) => {
-    if (!scene?.id) return;
+    if (!scene?.id || inactiveScenes.has(scene.id)) return;
     const state = pending.get(scene.id) ?? { fireEvents: false, seed: false, presenceOnly: true };
     state.fireEvents ||= fireEvents;
     state.seed ||= seed;
@@ -114,11 +122,16 @@ export function registerAuraRuntimeHooks(runtime, {
 
   on("canvasReady", () => {
     activeScene = currentScene(canvasRef);
+    if (activeScene?.id) inactiveScenes.delete(activeScene.id);
     schedule(activeScene, { seed: true, fireEvents: false });
   });
   on("canvasTearDown", async () => {
     const scene = activeScene ?? currentScene(canvasRef);
     if (!scene) return;
+    if (scene.id) {
+      inactiveScenes.add(scene.id);
+      cancelScheduled(scene.id);
+    }
     try { await runtime.deactivateScene(scene); }
     catch (error) { console.warn(`${MODULE_ID} | Could not clean up aura presence effects during canvas teardown.`, error); }
     activeScene = null;
@@ -214,7 +227,12 @@ export function registerAuraRuntimeHooks(runtime, {
     if (!prior || sameCombatState(prior, current)) return;
     handleTurnReport(runtime.handleCombatTurnChange?.(combat, prior, current));
   });
-
+  on("deleteCombat", (combat) => {
+    if (combat?.id) {
+      combatStates.delete(combat.id);
+      runtime.resetCombat?.(combat.id);
+    }
+  });
 
   return registrations;
 }

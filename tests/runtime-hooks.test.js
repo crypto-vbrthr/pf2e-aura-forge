@@ -14,7 +14,7 @@ test("runtime hooks cover canvas lifecycle, tokens, actors, and library settings
   const registrations = registerAuraRuntimeHooks(runtime, { hooks, canvasRef: { scene: null } });
   assert.deepEqual(registrations.map((entry) => entry.name), [
     "canvasReady", "canvasTearDown", "createToken", "moveToken", "updateToken", "deleteToken", "updateActor",
-    "createItem", "updateItem", "deleteItem", "updateWorldTime", "updateSetting", "combatStart", "combatTurnChange", "updateCombat"
+    "createItem", "updateItem", "deleteItem", "updateWorldTime", "updateSetting", "combatStart", "combatTurnChange", "updateCombat", "deleteCombat"
   ]);
 });
 
@@ -168,4 +168,53 @@ test("managed immunity item changes schedule presence-only reconciliation for an
   hooks.call("deleteItem", item);
   await new Promise((resolve) => setTimeout(resolve, 80));
   assert.deepEqual(calls, ["presence"]);
+});
+
+
+test("canvas teardown cancels queued and late animation reconciliation for the old scene", async () => {
+  const hooks = new HookBus();
+  const scene = { id: "scene" };
+  const calls = [];
+  const canvasRef = { scene };
+  const runtime = {
+    async reconcileScene() { calls.push("reconcile"); },
+    async deactivateScene() { calls.push("deactivate"); }
+  };
+  registerAuraRuntimeHooks(runtime, { hooks, canvasRef });
+
+  hooks.call("updateToken", { parent: scene }, { x: 100 });
+  await hooks.call("canvasTearDown");
+  await new Promise((resolve) => setTimeout(resolve, 90));
+  assert.deepEqual(calls, ["deactivate"]);
+
+  let finishAnimation;
+  const animation = new Promise((resolve) => { finishAnimation = resolve; });
+  hooks.call("moveToken", { parent: scene, object: { animation } });
+  finishAnimation();
+  await new Promise((resolve) => setTimeout(resolve, 90));
+  assert.deepEqual(calls, ["deactivate"]);
+
+  canvasRef.scene = scene;
+  hooks.call("canvasReady");
+  await new Promise((resolve) => setTimeout(resolve, 90));
+  assert.deepEqual(calls, ["deactivate", "reconcile"]);
+});
+
+test("deleteCombat clears local and runtime combat-event history", () => {
+  const hooks = new HookBus();
+  const resets = [];
+  const runtime = {
+    reconcileScene() {},
+    deactivateScene() {},
+    resetCombat(id) { resets.push(id); }
+  };
+  const combat = { id: "combat-delete", round: 1, turn: 0, turns: [] };
+  registerAuraRuntimeHooks(runtime, {
+    hooks,
+    canvasRef: { scene: null },
+    gameRef: { combats: { contents: [combat] } }
+  });
+
+  hooks.call("deleteCombat", combat);
+  assert.deepEqual(resets, ["combat-delete"]);
 });

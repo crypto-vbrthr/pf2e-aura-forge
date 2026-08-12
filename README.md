@@ -1,6 +1,6 @@
 # PF2E Aura Forge
 
-Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 0.4.2 hardens the full aura runtime, including Presence Effects, enter/leave, turn-start/turn-end, saving throws, and temporary-immunity reconciliation.
+Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 0.4.3 is the **Runtime Review & Edge-Case Hardening** release for Presence Effects, enter/leave, turn events, saves, and temporary immunity.
 
 ## Included
 
@@ -19,7 +19,7 @@ Aura Forge is the aura-definition, assignment, and runtime layer for the Forge S
 - `enter` and `leave` transitions execute event effects for triggers without a saving throw.
 - Save-enabled `enter` and `leave` triggers use native PF2e saves and dispatch the matching degree-of-success outcome.
 - `request` mode explicitly routes the native PF2e roll dialog over the Aura Forge module socket to the active player assigned to or owning the target Actor, even if another client moved the token. `automatic` mode prefers one active GM; `gm` mode runs on that GM.
-- One deterministic runtime coordinator handles enter/leave side effects, while Presence/runtime Actor mutations still use the PF2e Actor `primaryUpdater`; this prevents duplicate effects and duplicate saves across connected clients.
+- Runtime side effects are owned by exactly one client per target Actor: PF2e `primaryUpdater` when available, with Aura Forge's deterministic coordinator only as a fallback. This keeps active-GM games single-writer while also supporting no-GM/player-owned sessions.
 - Before mutating runtime Effect Items, Aura Forge narrowly repairs PF2e physical Items that are structurally missing `system.description`, preventing unrelated malformed legacy/custom equipment from aborting the Actor reset triggered by effect creation.
 - Scene, token, actor-instance, targeting, radius, and library changes automatically schedule runtime reconciliation.
 - `api.engine.reconcileScene()`, `api.engine.deactivateScene()`, and `api.engine.status()` are available as additive diagnostics/runtime controls.
@@ -64,7 +64,7 @@ matching Tokens inside range
 
 The runtime prefers PF2e's Token placeable `distanceTo()` measurement, matching the system's own initial aura range check. A rectangle/grid fallback exists for degraded/test contexts. Presence effects are forced to unlimited global duration because their lifetime is controlled by aura membership, then removed by their exact Aura Forge binding when no longer desired. The binding is inserted into the Effect Definition metadata before Critical Forge creates the PF2e Effect Item, avoiding a second Actor/Item update solely for runtime tagging.
 
-For a trigger **without** a saving throw, the `success` outcome slot is the direct event effect. For a trigger **with** a saving throw, the runtime coordinator routes the roll to the correct client, that client calls the target Actor's native PF2e save statistic, and the resulting degree is returned to the coordinator before the matching Effect Forge outcome is applied. Temporary immunity, `turnStart`, and `turnEnd` are executed by the runtime. Aura Forge treats discrete events and continuous Presence state as two phases: event outcomes and immunity changes complete first, then Presence Effects are reconciled from current aura membership and immunity state. A newly granted presence-blocking immunity therefore removes an already active Presence Effect immediately; when that immunity expires, the Presence Effect returns automatically if the target is still inside the aura. Foundry world-time changes and managed immunity Item create/update/delete events also schedule non-event reconciliation so expiry does not depend on token movement. Temporary immunities are visible PF2e Effect Items with their configured duration and are checked before any event trigger from the matching aura is executed.
+For a trigger **without** a saving throw, the `success` outcome slot is the direct event effect. For a trigger **with** a saving throw, the target Actor's single runtime updater owns the event and routes an owner-facing roll over the module socket when required. The resolver calls the target Actor's native PF2e save statistic and returns the degree before the owning client applies the matching Effect Forge outcome. `turnStart` and `turnEnd` use the same ownership path. Temporary immunities are visible PF2e Effect Items with their configured duration and are checked before a new aura event begins. If one trigger grants immunity, sibling triggers belonging to that same already-started event still resolve; the immunity applies to subsequent events and to the post-event Presence pass.
 
 ## Public API
 
@@ -83,7 +83,7 @@ console.log(api.engine.status());
 
 ## Current runtime boundary
 
-This release executes Presence Effects plus save/no-save `enter`, `leave`, `turnStart`, and `turnEnd` triggers. Temporary immunity can be granted on configured degrees of success, persists as a PF2e Effect Item, and blocks matching aura event triggers until it expires. Minute/hour/day immunity also has a world-time fallback check; round-based expiry follows PF2e effect-duration state. The runtime still does not reproduce PF2e's native aura-square wall/sensory-trait blocking; spatial membership uses PF2e token distance.
+This release executes Presence Effects plus save/no-save `enter`, `leave`, `turnStart`, and `turnEnd` triggers. Temporary immunity can be granted on configured degrees of success, persists as a PF2e Effect Item, and blocks matching aura event triggers until it expires. Minute/hour/day immunity also has a world-time fallback check; round-based expiry follows PF2e effect-duration state. The runtime still does not reproduce PF2e's native aura-square wall/sensory-trait blocking; spatial membership uses PF2e token distance. Hidden-token exclusion follows the native PF2e aura membership rule. Runtime operations are serialized per scene, queued work is cancelled during canvas teardown, and combat-event claims are keyed by combatant/token identity rather than mutable initiative indexes.
 
 ### Clean-install guard
 
