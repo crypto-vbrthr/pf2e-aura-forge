@@ -1,0 +1,108 @@
+{
+  "PF2E_AURA_FORGE": {
+    "WindowTitle": "Aura Forge",
+    "Open": "Aura Forge",
+    "Library": "Aura-Bibliothek",
+    "NewAura": "Neue Aura",
+    "NoAuras": "Noch keine gespeicherten Auren.",
+    "UntitledAura": "Unbenannte Aura",
+    "BasicData": "Grunddaten",
+    "Name": "Name",
+    "Description": "Beschreibung",
+    "Radius": "Radius (Fuß)",
+    "AbilityId": "Fähigkeits-ID / Immunitätsschlüssel",
+    "Enabled": "Aura aktiviert",
+    "Targeting": "Ziele",
+    "Allies": "Verbündete",
+    "Enemies": "Gegner",
+    "Neutral": "Neutrale Kreaturen",
+    "Source": "Quelle selbst",
+    "RequiredTraits": "Erforderliche Traits (kommagetrennt)",
+    "ExcludedTraits": "Ausgeschlossene Traits (kommagetrennt)",
+    "PresenceEffects": "Präsenzwirkungen",
+    "PresenceEffectsHint": "Diese Effekte gelten kontinuierlich, solange ein gültiges Ziel innerhalb der Aura ist. Die spätere Aura Engine kann sie jederzeit aus dem aktuellen Zustand rekonstruieren.",
+    "AddPresenceEffect": "Präsenzwirkung hinzufügen",
+    "PresenceEffect": "Präsenzwirkung",
+    "NewPresenceEffect": "Neue Präsenzwirkung",
+    "Triggers": "Ereigniswirkungen",
+    "TriggersHint": "Trigger reagieren auf einzelne Ereignisse. Rettungswurf, Erfolgsgrade und zeitliche Immunität gehören zum Trigger; die Wirkung selbst kommt aus der Effect Forge.",
+    "AddTrigger": "Trigger hinzufügen",
+    "Trigger": "Trigger",
+    "NewTrigger": "Neuer Trigger",
+    "Label": "Bezeichnung",
+    "Event": "Ereignis",
+    "SavingThrow": "Rettungswurf anfordern",
+    "TemporaryImmunity": "Zeitlich begrenzte Immunität",
+    "Type": "Art",
+    "DC": "SG",
+    "Mode": "Modus",
+    "Duration": "Dauer",
+    "Unit": "Einheit",
+    "Scope": "Geltungsbereich",
+    "NoEffect": "Kein Effekt definiert",
+    "EditEffect": "Effekt bearbeiten",
+    "Components": "Komponenten",
+    "EmbeddedEffectEditor": "Effect Editor",
+    "EmbeddedEffectEditorHint": "Dies ist direkt der Embedded Editor der Effect Forge. Speichern und Aura-Verwaltung bleiben Aufgabe der Aura Forge.",
+    "CloseEditor": "Editor schließen",
+    "Validation": "Validierung",
+    "Save": "Speichern",
+    "Duplicate": "Duplizieren",
+    "Delete": "Löschen",
+    "Close": "Schließen",
+    "UnsavedChanges": "Ungespeicherte Änderungen",
+    "AllChangesSaved": "Gespeichert",
+    "CopySuffix": " (Kopie)",
+    "TriggerEvents": {
+      "enter": "Beim Betreten",
+      "leave": "Beim Verlassen",
+      "turnStart": "Zu Beginn des Zuges",
+      "turnEnd": "Am Ende des Zuges"
+    },
+    "SaveTypes": {
+      "fortitude": "Zähigkeit",
+      "reflex": "Reflex",
+      "will": "Wille"
+    },
+    "SaveModes": {
+      "request": "Spieler anfordern",
+      "automatic": "Automatisch würfeln",
+      "gm": "SL-Anforderung"
+    },
+    "ImmunityScopes": {
+      "instance": "Diese Aura-Instanz",
+      "source": "Diese Quelle",
+      "ability": "Diese Fähigkeit"
+    },
+    "Degrees": {
+      "criticalSuccess": "Kritischer Erfolg",
+      "success": "Erfolg",
+      "failure": "Fehlschlag",
+      "criticalFailure": "Kritischer Fehlschlag"
+    },
+    "DurationUnits": {
+      "rounds": "Runden",
+      "minutes": "Minuten",
+      "hours": "Stunden",
+      "days": "Tage"
+    },
+    "Notifications": {
+      "GmOnly": "Die Aura Forge kann nur von der Spielleitung geöffnet werden.",
+      "EffectForgeMissing": "Die Aura Forge benötigt die kompatible PF2E Critical Forge / Effect Forge API.",
+      "EffectEditorFailed": "Der Embedded Effect Editor konnte nicht geladen werden.",
+      "ValidationFailed": "Die Aura enthält noch ungültige Angaben.",
+      "Saved": "Aura gespeichert.",
+      "NameRequired": "Bitte gib der Aura zuerst einen Namen."
+    },
+    "Dialogs": {
+      "DiscardTitle": "Änderungen verwerfen?",
+      "DiscardPrompt": "Es gibt ungespeicherte Änderungen. Sollen sie verworfen werden?",
+      "DeleteTitle": "Aura löschen?",
+      "DeletePrompt": "Die ausgewählte Aura wird dauerhaft aus der Aura-Bibliothek entfernt."
+    },
+    "Settings": {
+      "AuraLibrary": "Aura Forge Library",
+      "WindowState": "Aura Forge Window State"
+    }
+  }
+}

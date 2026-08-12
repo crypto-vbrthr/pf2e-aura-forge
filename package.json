@@ -1,0 +1,13 @@
+{
+  "name": "pf2e-aura-forge",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1",
+    "release:check": "npm test && node tools/release-check.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

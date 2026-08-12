@@ -1,0 +1,69 @@
+.pf2e-aura-forge .window-content { padding: 0; overflow: hidden; }
+.aura-forge-shell { display: grid; grid-template-columns: 250px minmax(0,1fr); height: 100%; min-height: 0; }
+.aura-forge-library { border-right: 1px solid var(--color-border-light-2); padding: .75rem; display: flex; flex-direction: column; gap: .75rem; min-height: 0; background: rgba(0,0,0,.04); }
+.aura-forge-library header { display: grid; gap: .5rem; }
+.aura-forge-library h2,.aura-forge-main h1,.aura-forge-section h2 { margin: 0; }
+.aura-forge-library-list { display: flex; flex-direction: column; gap: .35rem; overflow: auto; }
+.aura-library-entry { display: flex; gap: .5rem; align-items: center; text-align: left; width: 100%; }
+.aura-library-entry.selected { outline: 2px solid var(--color-border-highlight); }
+.aura-forge-main { display: grid; grid-template-rows: auto minmax(0,1fr) auto; min-width: 0; min-height: 0; }
+.aura-forge-toolbar,.aura-forge-footer { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.75rem 1rem; border-bottom:1px solid var(--color-border-light-2); }
+.aura-forge-footer { border-top:1px solid var(--color-border-light-2); border-bottom:0; }
+.aura-forge-footer>div { display:flex; gap:.5rem; flex-wrap:wrap; }
+.aura-forge-scroll { overflow:auto; padding:1rem; display:grid; gap:1rem; }
+.aura-forge-section { border:1px solid var(--color-border-light-2); border-radius:8px; padding:1rem; display:grid; gap:.8rem; }
+.aura-forge-section label { display:grid; gap:.25rem; }
+.aura-forge-grid { display:grid; gap:.75rem; }
+.aura-forge-grid.two-columns { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.aura-forge-grid.three-columns { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.aura-forge-target-grid { display:flex; flex-wrap:wrap; gap:1rem; }
+.checkbox-row { display:flex!important; align-items:center; gap:.4rem!important; }
+.full-width { width:100%; }
+.section-header,.trigger-header,.aura-card-row { display:flex; align-items:end; justify-content:space-between; gap:.75rem; }
+.section-header p,.aura-forge-api-status { margin:.2rem 0 0; opacity:.75; }
+.aura-card-list { display:grid; gap:.75rem; }
+.aura-card { border:1px solid var(--color-border-light-2); border-radius:7px; padding:.75rem; display:grid; gap:.75rem; }
+.grow { flex:1; min-width:160px; }
+.effect-chip { display:inline-flex; align-items:center; gap:.35rem; border:1px solid var(--color-border-light-2); border-radius:999px; padding:.35rem .6rem; white-space:nowrap; }
+.effect-chip.empty { opacity:.6; font-style:italic; }
+.trigger-config-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+.trigger-config-box { border:1px solid var(--color-border-light-2); border-radius:6px; padding:.65rem; display:grid; gap:.6rem; }
+.degree-checkboxes { display:flex; flex-wrap:wrap; gap:.75rem; margin-top:.5rem; }
+.outcomes-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
+.outcome-card { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.5rem; border:1px solid var(--color-border-light-2); border-radius:6px; padding:.5rem; }
+.outcome-actions { display:flex; gap:.25rem; }
+.embedded-effect-section { background:rgba(127,127,127,.06); }
+.aura-forge-dirty { display:flex; align-items:center; gap:.4rem; font-size:.9em; }
+.aura-forge-dirty.clean i { color:#4a9; }.aura-forge-dirty.dirty i { color:#d98b2b; }
+.aura-forge-api-status.error,.validation-errors { color:var(--color-level-error,#b33); }
+.validation-warnings { color:var(--color-level-warning,#a66b00); }
+.validation-section code { opacity:.7; }
+.aura-forge-muted { opacity:.65; font-style:italic; }
+button.danger { color:var(--color-level-error,#b33); }
+.pf2e-aura-forge-open { white-space:nowrap; }
+@media (max-width:900px){ .aura-forge-shell{grid-template-columns:190px minmax(0,1fr)} .trigger-config-grid,.outcomes-grid,.aura-forge-grid.two-columns,.aura-forge-grid.three-columns{grid-template-columns:1fr} .section-header,.trigger-header,.aura-card-row{align-items:stretch;flex-direction:column} }
+
+/* Embedded Effect Editor lives inline with the aura entry it edits. */
+.embedded-effect-inline {
+  display: grid;
+  gap: .65rem;
+  min-width: 0;
+  padding: .75rem;
+  border: 1px solid var(--color-border-light-2);
+  border-radius: 7px;
+  background: rgba(127,127,127,.06);
+}
+.embedded-effect-inline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+.embedded-effect-inline-header > strong {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+.outcome-card.editing { grid-column: 1 / -1; grid-template-columns: auto minmax(0,1fr) auto; }
+.outcome-card .outcome-effect-editor { grid-column: 1 / -1; }
+.embedded-effect-inline [data-embedded-effect-editor] { min-width: 0; }
