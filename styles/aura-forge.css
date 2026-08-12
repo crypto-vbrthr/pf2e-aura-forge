@@ -43,15 +43,25 @@ button.danger { color:var(--color-level-error,#b33); }
 .pf2e-aura-forge-open { white-space:nowrap; }
 @media (max-width:900px){ .aura-forge-shell{grid-template-columns:190px minmax(0,1fr)} .trigger-config-grid,.outcomes-grid,.aura-forge-grid.two-columns,.aura-forge-grid.three-columns{grid-template-columns:1fr} .section-header,.trigger-header,.aura-card-row{align-items:stretch;flex-direction:column} }
 
-/* Embedded Effect Editor lives inline with the aura entry it edits. */
+/* Embedded Effect Editor lives inline with the aura entry it edits.
+ * The panel also carries Critical Forge's public theme scope/classes so the
+ * embedded editor uses the exact same palette, component borders, fields,
+ * buttons, and focus states as the standalone Effect Forge. Aura Forge only
+ * contributes layout overrides here. */
 .embedded-effect-inline {
   display: grid;
   gap: .65rem;
   min-width: 0;
+  min-height: 0;
   padding: .75rem;
-  border: 1px solid var(--color-border-light-2);
-  border-radius: 7px;
-  background: rgba(127,127,127,.06);
+}
+.embedded-effect-inline.pf2e-critical-forge {
+  min-width: 0;
+  min-height: 0;
+}
+.embedded-effect-inline .effect-editor-embedded {
+  min-width: 0;
+  color: var(--ef-text);
 }
 .embedded-effect-inline-header {
   display: flex;

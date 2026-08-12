@@ -21,20 +21,16 @@ import {
   getEffectForgeApi
 } from "../integration/effect-forge-bridge.js";
 import { captureScrollState, restoreScrollState } from "./view-state.js";
+import {
+  AURA_FORGE_DEFAULT_WINDOW_SIZE,
+  normalizeSavedWindowState,
+  normalizeWindowState
+} from "./window-state.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 function clone(value) {
   return value == null ? value : foundry.utils.deepClone(value);
-}
-
-function normalizeWindowState(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  const result = {};
-  for (const key of ["left", "top", "width", "height"]) {
-    if (Number.isFinite(Number(value[key]))) result[key] = Number(value[key]);
-  }
-  return result;
 }
 
 function effectSummary(effect) {
@@ -86,7 +82,7 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       icon: "fa-solid fa-circle-nodes",
       resizable: true
     },
-    position: { width: 1240, height: 840 },
+    position: { ...AURA_FORGE_DEFAULT_WINDOW_SIZE },
     actions: {
       newAura: AuraForgeApp.newAura,
       selectAura: AuraForgeApp.selectAura,
@@ -112,7 +108,7 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
   constructor(options = {}) {
     let savedPosition = {};
     try {
-      savedPosition = normalizeWindowState(game.settings?.get?.(MODULE_ID, SETTINGS.WINDOW_STATE) ?? {});
+      savedPosition = normalizeSavedWindowState(game.settings?.get?.(MODULE_ID, SETTINGS.WINDOW_STATE) ?? {});
     } catch {
       savedPosition = {};
     }

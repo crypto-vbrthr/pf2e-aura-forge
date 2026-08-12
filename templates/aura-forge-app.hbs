@@ -78,7 +78,7 @@
                 <button type="button" class="danger" data-action="removePresenceEffect" data-presence-id="{{presence.id}}"><i class="fa-solid fa-trash"></i></button>
               </div>
               {{#if presence.isEditing}}
-                <div class="embedded-effect-inline" data-embedded-effect-panel>
+                <div class="embedded-effect-inline pf2e-critical-forge effect-forge-panel" data-embedded-effect-panel>
                   <header class="embedded-effect-inline-header">
                     <strong><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "PF2E_AURA_FORGE.EmbeddedEffectEditor"}}</strong>
                     <button type="button" data-action="closeEmbeddedEditor"><i class="fa-solid fa-xmark"></i> {{localize "PF2E_AURA_FORGE.CloseEditor"}}</button>
@@ -138,7 +138,7 @@
                       {{#if outcome.hasEffect}}<button type="button" class="danger" data-action="clearOutcomeEffect" data-trigger-id="{{trigger.id}}" data-degree="{{outcome.degree}}"><i class="fa-solid fa-xmark"></i></button>{{/if}}
                     </div>
                     {{#if outcome.isEditing}}
-                      <div class="embedded-effect-inline outcome-effect-editor" data-embedded-effect-panel>
+                      <div class="embedded-effect-inline outcome-effect-editor pf2e-critical-forge effect-forge-panel" data-embedded-effect-panel>
                         <header class="embedded-effect-inline-header">
                           <strong><i class="fa-solid fa-wand-magic-sparkles"></i> {{outcome.label}}</strong>
                           <button type="button" data-action="closeEmbeddedEditor"><i class="fa-solid fa-xmark"></i> {{localize "PF2E_AURA_FORGE.CloseEditor"}}</button>

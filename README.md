@@ -1,6 +1,6 @@
 # PF2E Aura Forge
 
-Aura Forge is the aura-definition and management layer for the Forge Suite. Version 0.1.1 contains the **Aura Core & Editor Foundation** milestone.
+Aura Forge is the aura-definition and management layer for the Forge Suite. Version 0.1.3 contains the **Aura Core & Editor Foundation** milestone.
 
 ## Included in this milestone
 
