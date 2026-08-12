@@ -24,6 +24,32 @@ function abilityDescription(definition) {
   return String(definition?.description ?? "");
 }
 
+function auraRuleSlug(definition, instance) {
+  return `aura-forge-${String(definition?.id ?? instance?.definitionId ?? "aura")}-${String(instance?.id ?? "instance")}`
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function resolvedRadius(definition, instance) {
+  const override = instance?.overrides?.radius;
+  const value = override == null || override === "" ? definition?.radius : override;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 5;
+}
+
+export function createNativeAuraRule(definition, instance) {
+  if (instance?.enabled === false) return null;
+  return {
+    key: "Aura",
+    slug: auraRuleSlug(definition, instance),
+    radius: resolvedRadius(definition, instance),
+    traits: [],
+    effects: [],
+    mergeExisting: false
+  };
+}
+
 /**
  * The owned PF2e ability is deliberately only a sheet-visible proxy. Aura
  * runtime state remains in the lightweight actor flag instance, and the
@@ -38,7 +64,11 @@ export function createAuraAbilitySource(definition, instance) {
       actionType: { value: "passive" },
       actions: { value: null },
       category: "interaction",
-      traits: { value: [], otherTags: [] }
+      traits: { value: ["aura"], otherTags: [] },
+      rules: (() => {
+        const rule = createNativeAuraRule(definition, instance);
+        return rule ? [rule] : [];
+      })()
     },
     flags: {
       [MODULE_ID]: {
@@ -79,6 +109,8 @@ export class ActorAuraService {
       "system.actionType.value": "passive",
       "system.actions.value": null,
       "system.category": "interaction",
+      "system.traits.value": ["aura"],
+      "system.rules": clone(source.system.rules),
       [`flags.${MODULE_ID}.${AURA_ABILITY_FLAG}`]: source.flags[MODULE_ID][AURA_ABILITY_FLAG]
     };
   }

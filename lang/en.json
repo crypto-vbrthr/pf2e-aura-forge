@@ -125,6 +125,7 @@
     "Inactive": "Inactive",
     "RadiusOverride": "Radius override (feet)",
     "DropActor": "Drop actor here",
-    "DropActorHint": "Drag an actor from the Actor Directory into this area to assign the aura."
+    "DropActorHint": "Drag an actor from the Actor Directory into this area to assign the aura.",
+    "DirectTriggerHint": "Without a saving throw, runtime uses the Success effect as the direct event effect. Saving throws are now resolved by the runtime for enter/leave events; temporary immunity plus turn-start/turn-end follow in the next runtime milestone."
   }
 }

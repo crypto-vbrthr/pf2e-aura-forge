@@ -22,7 +22,7 @@ function compatibleApi() {
   return {
     version: "0.9.4",
     schemaVersion: 2,
-    effects: { validate() { return { valid: true, errors: [], warnings: [] }; } },
+    effects: { validate() { return { valid: true, errors: [], warnings: [] }; }, async apply() { return []; } },
     builders: { effect: () => fakeBuilder() },
     ui: { effectEditor: { createSession() {}, create() {} } }
   };
@@ -50,4 +50,14 @@ test("default embedded effects are created through the public builder", () => {
   assert.equal(definition.name, "Aura Effect");
   assert.deepEqual(definition.duration, { value: -1, unit: "unlimited", expiry: null });
   assert.equal(definition.metadata.originModule, "pf2e-aura-forge");
+});
+
+test("bridge rejects a Critical Forge API without effect application support", () => {
+  const api = compatibleApi();
+  delete api.effects.apply;
+  assert.throws(() => assertEffectForgeApi(api), (error) => {
+    assert.ok(error instanceof EffectForgeIntegrationError);
+    assert.equal(error.code, "EFFECT_APPLICATION_API_MISSING");
+    return true;
+  });
 });

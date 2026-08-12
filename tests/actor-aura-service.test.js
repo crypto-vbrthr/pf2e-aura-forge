@@ -82,6 +82,11 @@ test("Aura Forge actor proxies are passive PF2e abilities", () => {
   assert.equal(source.system.actionType.value, "passive");
   assert.equal(source.system.actions.value, null);
   assert.equal(source.system.category, "interaction");
+  assert.deepEqual(source.system.traits.value, ["aura"]);
+  assert.equal(source.system.rules.length, 1);
+  assert.equal(source.system.rules[0].key, "Aura");
+  assert.equal(source.system.rules[0].radius, aura.radius);
+  assert.deepEqual(source.system.rules[0].effects, []);
   assert.equal(source.system.description.value, aura.description);
   assert.equal(source.flags["pf2e-aura-forge"][AURA_ABILITY_FLAG].instanceId, "inst.1");
 });
@@ -161,4 +166,29 @@ test("syncDefinition keeps actor ability names and descriptions in step with the
   const ability = auraAbility(actor, instance.id);
   assert.equal(ability.name, "New Name");
   assert.equal(ability.system.description.value, "New text");
+});
+
+
+test("actor proxy native Aura rule follows enabled state and radius overrides", async () => {
+  const aura = createAuraDefinition({ id: "aura.visual", name: "Visible Aura", radius: 15 });
+  const actor = new MockActor("actor.visual", "Aura Bearer");
+  const service = new ActorAuraService({ library: library([aura]) });
+  const instance = await service.assign(actor, aura.id);
+  let ability = auraAbility(actor, instance.id);
+  assert.deepEqual(ability.system.traits.value, ["aura"]);
+  assert.equal(ability.system.rules[0].key, "Aura");
+  assert.equal(ability.system.rules[0].radius, 15);
+
+  await service.setRadiusOverride(actor, instance.id, 30);
+  ability = auraAbility(actor, instance.id);
+  assert.equal(ability.system.rules[0].radius, 30);
+
+  await service.setEnabled(actor, instance.id, false);
+  ability = auraAbility(actor, instance.id);
+  assert.deepEqual(ability.system.rules, []);
+  assert.deepEqual(ability.system.traits.value, ["aura"]);
+
+  await service.setEnabled(actor, instance.id, true);
+  ability = auraAbility(actor, instance.id);
+  assert.equal(ability.system.rules[0].radius, 30);
 });

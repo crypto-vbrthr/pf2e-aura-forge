@@ -11,12 +11,25 @@ import { createFoundryAuraRepository } from "../aura/foundry-aura-repository.js"
 import { auraEngineCore } from "../engine/aura-engine-core.js";
 import { ActorAuraService } from "../actor/actor-aura-service.js";
 import { getEffectForgeApi } from "../integration/effect-forge-bridge.js";
+import { AuraRuntimeEngine } from "../runtime/aura-runtime-engine.js";
+
+let runtimeEngine = null;
+
+export function getAuraRuntimeEngine() {
+  return runtimeEngine;
+}
 
 export function initializePublicApi({ openAuraForge }) {
   const module = game.modules.get(MODULE_ID);
   if (!module) throw new Error(`Module ${MODULE_ID} is unavailable.`);
   const repository = createFoundryAuraRepository();
   const actorAuras = new ActorAuraService({ library: repository });
+  runtimeEngine = new AuraRuntimeEngine({
+    library: repository,
+    actorAuras,
+    effectApi: getEffectForgeApi(),
+    gameRef: game
+  });
 
   const api = Object.freeze({
     version: API_VERSION,
@@ -54,7 +67,10 @@ export function initializePublicApi({ openAuraForge }) {
     }),
 
     engine: Object.freeze({
-      planPresence: (options) => auraEngineCore.planPresence(options)
+      planPresence: (options) => auraEngineCore.planPresence(options),
+      reconcileScene: (scene = globalThis.canvas?.scene, options = {}) => runtimeEngine.reconcileScene(scene, options),
+      deactivateScene: (scene = globalThis.canvas?.scene) => runtimeEngine.deactivateScene(scene),
+      status: () => runtimeEngine.status()
     }),
 
     ui: Object.freeze({

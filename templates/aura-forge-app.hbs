@@ -174,6 +174,8 @@
                 </div>
               </div>
 
+              {{#unless trigger.save.enabled}}<p class="aura-forge-muted direct-trigger-hint"><i class="fa-solid fa-circle-info"></i> {{localize "PF2E_AURA_FORGE.DirectTriggerHint"}}</p>{{/unless}}
+
               <div class="outcomes-grid">
                 {{#each trigger.outcomes as |outcome|}}
                   <div class="outcome-card {{#if outcome.isEditing}}editing{{/if}}">

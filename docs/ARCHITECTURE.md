@@ -12,8 +12,12 @@ Actor
 └── Item[type=action, actionType=passive]
     └── managed Aura ability proxy for sheet visibility
 
-Aura Engine Core
-└── later resolves Actor instances into active runtime auras
+Aura Runtime Engine
+├── resolve active Actor instances on scene source tokens
+├── spatial + target eligibility
+├── desired Presence Effect reconciliation
+├── enter/leave occupancy transitions
+└── Effect Forge public application API
 ```
 
 Aura Definitions own targeting, presence effects, triggers, saves, temporary immunity policy, and Effect Forge payloads. Aura Instances do not copy those definitions. They reference `definitionId` and hold only Actor-specific state. A managed passive PF2e ability mirrors the aura name/description on the Actor sheet; it contains no runtime authority and is recreated from the instance/definition if missing.
@@ -35,14 +39,45 @@ Aura Definitions own targeting, presence effects, triggers, saves, temporary imm
 
 `definitionName` is a display snapshot only. `definitionId` is authoritative.
 
-## Resolution
+## Runtime resolution
 
-Resolving an instance clones its current Aura Definition, applies supported instance overrides, and combines definition/instance enabled state. The library object is never mutated.
+Each scene token whose Actor owns an enabled Aura Instance becomes an emitter. The current central Aura Definition is resolved and instance overrides are applied without mutating the library object.
 
-## Referential integrity
+Runtime target classification prefers PF2e Actor relationship helpers (`isAllyOf` / `isEnemyOf`) and uses Actor traits for required/excluded trait filtering. Spatial membership prefers PF2e Token placeable `distanceTo()`, which is also used by the PF2e system as the initial native-aura range test.
 
-Deleting an Aura Definition also removes references to that definition from world Actors and removes the matching managed ability proxies. Duplication creates a new definition but never copies Actor assignments. On world ready, reconciliation upgrades legacy flag-only assignments and removes orphaned managed proxies.
+## Presence bindings
 
-## Embedded Effect Editor
+Presence Effects are desired-state mechanics, not historical enter events. For every emitter/presence/target-Actor combination the runtime derives a stable binding key:
 
-Aura Forge continues to use only the public PF2E Critical Forge editor API. Actor assignment is Aura Forge container logic and does not alter the Effect Forge API contract.
+```text
+scene + source token + aura instance + presence effect + target Actor UUID
+```
+
+Effect Forge creates the actual PF2e Effect Item(s). Before that public API call, Aura Forge embeds its `auraPresenceBinding` in the Effect Definition `metadata`. Critical Forge persists the complete source definition in its own managed flags, so Aura Forge can reconstruct runtime state from Actor documents after reload and clean up the exact bound effect without a second post-create Item update. Legacy direct Aura Forge `presenceBinding` flags remain readable for cleanup.
+
+If the embedded Effect Definition changes, its fingerprint changes. The stale bound effect bundle is removed and recreated from the new definition. Presence global duration is forced to unlimited; aura membership controls lifetime.
+
+## Enter / Leave transitions
+
+The engine keeps in-memory occupancy per scene/source-token/instance. Initial scene reconciliation seeds occupancy and therefore does not synthesize `enter` effects for creatures already inside after a reload. Subsequent movement reconciliations compare previous and current occupancy and execute `enter`/`leave` trigger effects.
+
+A trigger without a saving throw uses its `success` outcome as the direct event effect. Save-enabled `enter`/`leave` triggers resolve through the native PF2e saving-throw statistic and dispatch the matching degree-of-success outcome. One deterministic runtime coordinator detects transition side effects. In `request` mode it sends a module-socket request to an active non-GM user assigned to or owning the target Actor when possible; the player returns only the resolved degree/status and the coordinator applies the matching Effect Forge outcome exactly once. `automatic` and GM-request modes prefer the selected active GM. This routing is deliberately separate from PF2e `primaryUpdater`, which remains the authority for Actor document mutation. Vanishing/disabled emitters clean Presence Effects but do not synthesize a `leave` event. Temporary immunity and turn-bound triggers remain a later runtime layer.
+
+## Multi-client ownership
+
+Coordinate-bearing `updateToken` hooks are treated as transition-capable on every client, while only the deterministic runtime coordinator executes enter/leave side effects. The runtime still mutates a target Actor only when the current user is that PF2e Actor's `primaryUpdater`, preventing duplicate effect creation. Player-request save dialogs are routed over the module socket and therefore do not depend on which client physically moved the token. Before creating/removing runtime Effect Items, a narrow compatibility guard normalizes completely missing `system.description` objects on PF2e physical Items; this prevents an unrelated malformed legacy/custom item from crashing the full Actor reset triggered by an embedded-item mutation.
+
+## Lifecycle
+
+- `ready` / `canvasReady`: seed occupancy and reconstruct Presence Effects.
+- `moveToken`: reconcile with enter/leave events.
+- `updateToken`: reconcile non-event geometry/state changes.
+- `createToken`: reconcile and permit an enter transition after the scene has been seeded.
+- `deleteToken`: reconcile cleanup without synthetic leave.
+- `updateActor`: reconcile active-scene relationship/instance changes without synthetic transitions.
+- Aura Library setting updates: reconcile current definitions without synthetic transitions.
+- `canvasTearDown`: remove Presence Effects belonging to the scene and clear occupancy state.
+
+## Embedded Effect Editor and Effect Engine
+
+Aura Forge continues to use only the public PF2E Critical Forge API. The editor remains embedded UI; persistence and Aura workflow are owned by Aura Forge. Runtime effect application uses the unchanged public `effects.apply()` API.

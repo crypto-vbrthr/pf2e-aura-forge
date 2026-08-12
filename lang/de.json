@@ -125,6 +125,7 @@
     "Inactive": "Inaktiv",
     "RadiusOverride": "Radius-Override (Fuß)",
     "DropActor": "Actor hierher ziehen",
-    "DropActorHint": "Ziehe einen Actor aus dem Actor-Verzeichnis in dieses Feld, um ihm die Aura zuzuweisen."
+    "DropActorHint": "Ziehe einen Actor aus dem Actor-Verzeichnis in dieses Feld, um ihm die Aura zuzuweisen.",
+    "DirectTriggerHint": "Ohne Rettungswurf verwendet die Runtime die Wirkung unter „Erfolg“ als direkte Ereigniswirkung. Rettungswürfe werden bei Betreten und Verlassen jetzt durch die Runtime ausgeführt; zeitliche Immunität sowie Zugbeginn und Zugende folgen im nächsten Runtime-Block."
   }
 }

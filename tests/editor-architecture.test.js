@@ -33,3 +33,9 @@ test("Aura Forge preserves its scroll containers across action rerenders", () =>
   assert.match(templateSource, /data-scroll-key="main"/);
   assert.match(templateSource, /data-scroll-key="library"/);
 });
+
+
+test("trigger form synchronization scopes itself to trigger cards, not nested action buttons", () => {
+  assert.match(source, /querySelectorAll\("\.trigger-card\[data-trigger-id\]"\)/);
+  assert.doesNotMatch(source, /for \(const card of container\.querySelectorAll\("\[data-trigger-id\]"\)\)/);
+});

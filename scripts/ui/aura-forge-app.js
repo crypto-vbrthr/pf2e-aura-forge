@@ -55,6 +55,26 @@ function degreeLabel(degree) {
   return game.i18n.localize(`PF2E_AURA_FORGE.Degrees.${degree}`);
 }
 
+
+export function syncTriggerDraftFromCard(trigger, card) {
+  if (!trigger || !card?.querySelector) return trigger;
+  trigger.name = card.querySelector('[name="triggerName"]')?.value ?? trigger.name;
+  trigger.event = card.querySelector('[name="triggerEvent"]')?.value ?? trigger.event;
+  trigger.save.enabled = Boolean(card.querySelector('[name="saveEnabled"]')?.checked);
+  trigger.save.type = card.querySelector('[name="saveType"]')?.value ?? trigger.save.type;
+  trigger.save.mode = card.querySelector('[name="saveMode"]')?.value ?? trigger.save.mode;
+  trigger.save.dc.mode = "fixed";
+  trigger.save.dc.value = Number(card.querySelector('[name="saveDc"]')?.value ?? trigger.save.dc.value);
+  trigger.immunity.enabled = Boolean(card.querySelector('[name="immunityEnabled"]')?.checked);
+  trigger.immunity.duration.value = Number(card.querySelector('[name="immunityValue"]')?.value ?? trigger.immunity.duration.value);
+  trigger.immunity.duration.unit = card.querySelector('[name="immunityUnit"]')?.value ?? trigger.immunity.duration.unit;
+  trigger.immunity.scope = card.querySelector('[name="immunityScope"]')?.value ?? trigger.immunity.scope;
+  trigger.immunity.applyOn = [...(card.querySelectorAll?.('[data-immunity-degree]:checked') ?? [])]
+    .map((input) => input.dataset.immunityDegree)
+    .filter(Boolean);
+  return trigger;
+}
+
 function slugify(value) {
   return String(value ?? "effect")
     .trim()
@@ -414,23 +434,13 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       entry.name = row.querySelector('[name="presenceName"]')?.value ?? entry.name;
     }
 
-    for (const card of container.querySelectorAll("[data-trigger-id]")) {
+    // Only synchronize the trigger card itself. Nested action buttons also carry
+    // data-trigger-id for action routing; treating those as cards would reset
+    // checkbox-backed save/immunity configuration to false during Save.
+    for (const card of container.querySelectorAll(".trigger-card[data-trigger-id]")) {
       const trigger = this.draft.triggers.find((item) => item.id === card.dataset.triggerId);
       if (!trigger) continue;
-      trigger.name = card.querySelector('[name="triggerName"]')?.value ?? trigger.name;
-      trigger.event = card.querySelector('[name="triggerEvent"]')?.value ?? trigger.event;
-      trigger.save.enabled = Boolean(card.querySelector('[name="saveEnabled"]')?.checked);
-      trigger.save.type = card.querySelector('[name="saveType"]')?.value ?? trigger.save.type;
-      trigger.save.mode = card.querySelector('[name="saveMode"]')?.value ?? trigger.save.mode;
-      trigger.save.dc.mode = "fixed";
-      trigger.save.dc.value = Number(card.querySelector('[name="saveDc"]')?.value ?? trigger.save.dc.value);
-      trigger.immunity.enabled = Boolean(card.querySelector('[name="immunityEnabled"]')?.checked);
-      trigger.immunity.duration.value = Number(card.querySelector('[name="immunityValue"]')?.value ?? trigger.immunity.duration.value);
-      trigger.immunity.duration.unit = card.querySelector('[name="immunityUnit"]')?.value ?? trigger.immunity.duration.unit;
-      trigger.immunity.scope = card.querySelector('[name="immunityScope"]')?.value ?? trigger.immunity.scope;
-      trigger.immunity.applyOn = [...card.querySelectorAll('[data-immunity-degree]:checked')]
-        .map((input) => input.dataset.immunityDegree)
-        .filter(Boolean);
+      syncTriggerDraftFromCard(trigger, card);
     }
   }
 

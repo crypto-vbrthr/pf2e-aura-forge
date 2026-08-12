@@ -26,6 +26,9 @@ export function assertEffectForgeApi(api) {
   if (typeof api.effects?.validate !== "function") {
     throw new EffectForgeIntegrationError("Effect validation API is unavailable.", "EFFECT_VALIDATION_API_MISSING");
   }
+  if (typeof api.effects?.apply !== "function") {
+    throw new EffectForgeIntegrationError("Effect application API is unavailable.", "EFFECT_APPLICATION_API_MISSING");
+  }
   if (typeof api.builders?.effect !== "function") {
     throw new EffectForgeIntegrationError("Effect Builder API is unavailable.", "EFFECT_BUILDER_API_MISSING");
   }
