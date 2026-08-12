@@ -6,6 +6,7 @@ import { auraContainsToken } from "./spatial-service.js";
 import { createRuntimeTargetContext } from "./runtime-target-context.js";
 import { emitterRuntimeKey, planOccupancyTransitions } from "./runtime-transitions.js";
 import { AuraSaveResolutionService } from "./save-resolution-service.js";
+import { AuraImmunityService } from "./immunity-service.js";
 import {
   buildRuntimePresenceKey,
   collectPresenceBindings,
@@ -43,6 +44,10 @@ function canUpdateActor(actor, gameRef) {
   const user = gameRef?.user;
   if (!user || !actor) return false;
   if (actor.primaryUpdater) return actor.primaryUpdater === user;
+  // If PF2e cannot provide a primaryUpdater, fall back to the single Aura
+  // Forge runtime coordinator. This avoids two connected clients racing to
+  // create the same presence Item.
+  if (!isRuntimeCoordinator(gameRef)) return false;
   if (typeof actor.canUserModify === "function") return actor.canUserModify(user, "update");
   return Boolean(user.isGM);
 }
@@ -70,8 +75,11 @@ export class AuraRuntimeEngine {
     this.gameRef = gameRef;
     this.presenceBindings = new PresenceBindingService({ effectApi });
     this.saveResolution = new AuraSaveResolutionService({ gameRef });
+    this.immunities = new AuraImmunityService({ gameRef });
     this.socketService = null;
     this.occupancy = new Map();
+    this.processedCombatEvents = new Set();
+    this.reconcileQueues = new Map();
     this.initializedScenes = new Set();
     this.lastReport = null;
   }
@@ -135,6 +143,7 @@ export class AuraRuntimeEngine {
       if (!presence?.effect) continue;
       const byActor = new Map();
       for (const target of targets) {
+        if (this.immunities.blocksPresence(target.actor, emitter)) continue;
         const actorUuid = target.context.actorUuid;
         if (!actorUuid) continue;
         const entry = byActor.get(actorUuid) ?? { actor: target.actor, tokenIds: [] };
@@ -217,6 +226,40 @@ export class AuraRuntimeEngine {
     return { applied, errors };
   }
 
+  async #cleanupExpiredImmunities(scene) {
+    let removed = 0;
+    const errors = [];
+    for (const actor of uniqueActors(scene, this.gameRef)) {
+      if (!canUpdateActor(actor, this.gameRef)) continue;
+      try {
+        removed += await this.immunities.cleanupExpired(actor);
+      } catch (error) {
+        errors.push({ phase: "immunity-cleanup", actorUuid: actor?.uuid ?? actor?.id ?? null, error });
+      }
+    }
+    return { removed, errors };
+  }
+
+  async #reconcilePresencePhase(scene, { emitters = null, targetsByEmitter = null } = {}) {
+    const resolvedEmitters = emitters ?? await this.#emitters(scene);
+    const cleanup = await this.#cleanupExpiredImmunities(scene);
+    const desired = new Map();
+    for (const emitter of resolvedEmitters) {
+      const targets = targetsByEmitter?.get?.(emitter.key) ?? this.#currentTargets(emitter);
+      this.#desiredPresence(emitter, targets, desired);
+    }
+    const presencePlan = this.#planPresence(scene, desired);
+    const presenceRemove = await this.#removePresence(presencePlan);
+    const presenceAdd = await this.#addPresence(presencePlan, presenceRemove.failedRemoveKeys);
+    return {
+      desired: presencePlan.desired,
+      applied: presenceAdd.applied,
+      removed: presenceRemove.removed,
+      errors: [...cleanup.errors, ...presenceRemove.errors, ...presenceAdd.errors],
+      expiredImmunitiesRemoved: cleanup.removed
+    };
+  }
+
   async #applyTriggerOutcome(emitter, trigger, targetToken, event, degree) {
     const targetActor = targetToken?.actor;
     const effect = trigger.outcomes?.[degree] ?? null;
@@ -238,19 +281,66 @@ export class AuraRuntimeEngine {
     return 1;
   }
 
+  #immunityApplies(trigger, degree) {
+    return Boolean(
+      trigger?.immunity?.enabled
+      && Array.isArray(trigger.immunity.applyOn)
+      && trigger.immunity.applyOn.includes(degree)
+    );
+  }
+
+  async #applyTriggerImmunity(emitter, trigger, targetActor, degree) {
+    if (!this.#immunityApplies(trigger, degree)) return { applied: 0, error: null };
+    if (!canUpdateActor(targetActor, this.gameRef)) return { applied: 0, error: null };
+    try {
+      const existing = this.immunities.active(targetActor, emitter, trigger);
+      if (existing.length > 0) return { applied: 0, error: null };
+      const created = await this.immunities.apply(targetActor, emitter, trigger);
+      return { applied: created.length > 0 ? 1 : 0, error: null };
+    } catch (error) {
+      return { applied: 0, error };
+    }
+  }
+
   async #runTrigger(emitter, targetToken, event) {
     const targetActor = targetToken?.actor;
-    if (!targetActor) return { applied: 0, deferred: 0, savesResolved: 0, savesCancelled: 0, saveErrors: [] };
+    if (!targetActor) {
+      return {
+        applied: 0,
+        deferred: 0,
+        savesResolved: 0,
+        savesCancelled: 0,
+        saveErrors: [],
+        immunityApplied: 0,
+        immunitySkipped: 0,
+        immunityErrors: []
+      };
+    }
+
     let applied = 0;
     let deferred = 0;
     let savesResolved = 0;
     let savesCancelled = 0;
+    let immunityApplied = 0;
+    let immunitySkipped = 0;
     const saveErrors = [];
+    const immunityErrors = [];
+
+    if (canUpdateActor(targetActor, this.gameRef)) {
+      try { await this.immunities.cleanupExpired(targetActor); }
+      catch (error) { immunityErrors.push({ triggerId: null, status: "cleanup-error", error }); }
+    }
 
     for (const trigger of emitter.aura.triggers ?? []) {
       if (trigger?.event !== event) continue;
 
+      if (this.immunities.hasForEmitter(targetActor, emitter)) {
+        immunitySkipped += 1;
+        continue;
+      }
+
       if (trigger.save?.enabled) {
+        let result = null;
         try {
           const request = {
             targetActor,
@@ -259,28 +349,54 @@ export class AuraRuntimeEngine {
             trigger,
             aura: emitter.aura
           };
-          const result = this.socketService
+          result = this.socketService
             ? await this.socketService.resolveSave(request)
             : await this.saveResolution.roll(request);
-          if (result.status === "resolved") {
-            savesResolved += 1;
-            applied += await this.#applyTriggerOutcome(emitter, trigger, targetToken, event, result.degree);
-          } else if (result.status === "cancelled") {
-            savesCancelled += 1;
-          } else if (!["not-resolver", "not-required"].includes(result.status)) {
-            saveErrors.push({ triggerId: trigger.id, status: result.status, saveType: trigger.save.type });
-          }
         } catch (error) {
           saveErrors.push({ triggerId: trigger.id, status: "error", error });
+          continue;
+        }
+
+        if (result.status === "resolved") {
+          savesResolved += 1;
+          try {
+            applied += await this.#applyTriggerOutcome(emitter, trigger, targetToken, event, result.degree);
+          } catch (error) {
+            saveErrors.push({ triggerId: trigger.id, status: "outcome-error", error });
+          }
+          const immunity = await this.#applyTriggerImmunity(emitter, trigger, targetActor, result.degree);
+          immunityApplied += immunity.applied;
+          if (immunity.error) immunityErrors.push({ triggerId: trigger.id, status: "apply-error", error: immunity.error });
+        } else if (result.status === "cancelled") {
+          savesCancelled += 1;
+        } else if (!['not-resolver', 'not-required'].includes(result.status)) {
+          saveErrors.push({ triggerId: trigger.id, status: result.status, saveType: trigger.save.type });
         }
         continue;
       }
 
       if (!canUpdateActor(targetActor, this.gameRef)) continue;
       // Without a saving throw, the success slot is the canonical direct outcome.
-      applied += await this.#applyTriggerOutcome(emitter, trigger, targetToken, event, "success");
+      try {
+        applied += await this.#applyTriggerOutcome(emitter, trigger, targetToken, event, "success");
+      } catch (error) {
+        saveErrors.push({ triggerId: trigger.id, status: "outcome-error", error });
+      }
+      const immunity = await this.#applyTriggerImmunity(emitter, trigger, targetActor, "success");
+      immunityApplied += immunity.applied;
+      if (immunity.error) immunityErrors.push({ triggerId: trigger.id, status: "apply-error", error: immunity.error });
     }
-    return { applied, deferred, savesResolved, savesCancelled, saveErrors };
+
+    return {
+      applied,
+      deferred,
+      savesResolved,
+      savesCancelled,
+      saveErrors,
+      immunityApplied,
+      immunitySkipped,
+      immunityErrors
+    };
   }
 
   async #processTransitions(scene, emitters, currentByEmitter, { seed = false, fireEvents = true } = {}) {
@@ -290,7 +406,10 @@ export class AuraRuntimeEngine {
     let deferredSaves = 0;
     let savesResolved = 0;
     let savesCancelled = 0;
+    let immunityApplied = 0;
+    let immunitySkipped = 0;
     const saveErrors = [];
+    const immunityErrors = [];
     const activeEmitterKeys = new Set(emitters.map((emitter) => emitter.key));
 
     for (const emitter of emitters) {
@@ -320,6 +439,9 @@ export class AuraRuntimeEngine {
         savesResolved += result.savesResolved ?? 0;
         savesCancelled += result.savesCancelled ?? 0;
         saveErrors.push(...(result.saveErrors ?? []));
+        immunityApplied += result.immunityApplied ?? 0;
+        immunitySkipped += result.immunitySkipped ?? 0;
+        immunityErrors.push(...(result.immunityErrors ?? []));
       }
       for (const tokenId of transitions.left) {
         const token = tokenById(scene, tokenId);
@@ -330,6 +452,9 @@ export class AuraRuntimeEngine {
         savesResolved += result.savesResolved ?? 0;
         savesCancelled += result.savesCancelled ?? 0;
         saveErrors.push(...(result.saveErrors ?? []));
+        immunityApplied += result.immunityApplied ?? 0;
+        immunitySkipped += result.immunitySkipped ?? 0;
+        immunityErrors.push(...(result.immunityErrors ?? []));
       }
     }
 
@@ -339,40 +464,164 @@ export class AuraRuntimeEngine {
       if (key.startsWith(`${scene.id}::`) && !activeEmitterKeys.has(key)) this.occupancy.delete(key);
     }
 
-    return { entered, left, triggerEffects, deferredSaves, savesResolved, savesCancelled, saveErrors };
+    return {
+      entered,
+      left,
+      triggerEffects,
+      deferredSaves,
+      savesResolved,
+      savesCancelled,
+      saveErrors,
+      immunityApplied,
+      immunitySkipped,
+      immunityErrors
+    };
   }
 
-  async reconcileScene(scene, { seed = false, fireEvents = true } = {}) {
+  #tokenMatchesEmitter(emitter, targetToken) {
+    if (!targetToken?.actor) return false;
+    const context = createRuntimeTargetContext(emitter.sourceToken, targetToken);
+    return matchesAuraTarget(emitter.aura, context)
+      && auraContainsToken(emitter.sourceToken, targetToken, emitter.aura.radius, { scene: emitter.scene });
+  }
+
+  #combatTokenId(combat, state = {}) {
+    if (state?.tokenId) return state.tokenId;
+    if (state?.combatantId) {
+      const combatant = combat?.combatants?.get?.(state.combatantId)
+        ?? combat?.combatants?.contents?.find?.((entry) => entry.id === state.combatantId);
+      const id = combatant?.tokenId ?? combatant?.token?.id ?? combatant?.token?.document?.id;
+      if (id) return id;
+    }
+    const turn = Number(state?.turn);
+    if (Number.isInteger(turn) && turn >= 0) {
+      const turns = combat?.turns?.contents ?? combat?.turns ?? [];
+      const combatant = turns?.[turn];
+      return combatant?.tokenId ?? combatant?.token?.id ?? combatant?.token?.document?.id ?? null;
+    }
+    return null;
+  }
+
+  #claimCombatEvent(combat, event, state = {}) {
+    const key = [combat?.id ?? "combat", event, state?.round ?? "", state?.turn ?? "", state?.tokenId ?? ""]
+      .map((value) => String(value ?? ""))
+      .join("::");
+    if (this.processedCombatEvents.has(key)) return false;
+    this.processedCombatEvents.add(key);
+    if (this.processedCombatEvents.size > 200) {
+      const oldest = this.processedCombatEvents.values().next().value;
+      if (oldest) this.processedCombatEvents.delete(oldest);
+    }
+    return true;
+  }
+
+  async #runTurnEvent(scene, tokenId, event) {
+    const report = {
+      event,
+      tokenId: tokenId ?? null,
+      emittersMatched: 0,
+      triggerEffects: 0,
+      savesResolved: 0,
+      savesCancelled: 0,
+      saveErrors: [],
+      immunityApplied: 0,
+      immunitySkipped: 0,
+      immunityErrors: []
+    };
+    if (!scene?.id || !tokenId || !isRuntimeCoordinator(this.gameRef)) return report;
+    const targetToken = tokenById(scene, tokenId);
+    if (!targetToken?.actor) return report;
+
+    const emitters = await this.#emitters(scene);
+    for (const emitter of emitters) {
+      if (!this.#tokenMatchesEmitter(emitter, targetToken)) continue;
+      report.emittersMatched += 1;
+      const result = await this.#runTrigger(emitter, targetToken, event);
+      report.triggerEffects += result.applied ?? 0;
+      report.savesResolved += result.savesResolved ?? 0;
+      report.savesCancelled += result.savesCancelled ?? 0;
+      report.saveErrors.push(...(result.saveErrors ?? []));
+      report.immunityApplied += result.immunityApplied ?? 0;
+      report.immunitySkipped += result.immunitySkipped ?? 0;
+      report.immunityErrors.push(...(result.immunityErrors ?? []));
+    }
+
+    // A turn-bound outcome can grant or refresh immunity after a Presence
+    // Effect already exists. Reconcile continuous state only after all event
+    // side effects have completed so newly granted immunity takes effect
+    // immediately, and expired immunity can restore Presence while the target
+    // is still inside the aura.
+    report.presence = await this.reconcilePresence(scene);
+    return report;
+  }
+
+  async handleCombatTurnChange(combat, prior = {}, current = {}) {
+    const scene = combat?.scene ?? this.gameRef?.scenes?.get?.(combat?.scene?.id ?? combat?.sceneId) ?? globalThis.canvas?.scene ?? null;
+    if (!scene?.id) return null;
+
+    const priorRound = Number(prior?.round ?? 0);
+    const currentRound = Number(current?.round ?? 0);
+    const priorTurn = Number(prior?.turn ?? -1);
+    const currentTurn = Number(current?.turn ?? -1);
+    const forward = currentRound > priorRound || (currentRound === priorRound && currentTurn > priorTurn);
+    if (!forward) {
+      return { sceneId: scene.id, forward: false, turnEnd: null, turnStart: null };
+    }
+
+    const priorTokenId = this.#combatTokenId(combat, prior);
+    const currentTokenId = this.#combatTokenId(combat, current);
+    const priorState = { ...prior, tokenId: priorTokenId };
+    const currentState = { ...current, tokenId: currentTokenId };
+    const turnEnd = this.#claimCombatEvent(combat, "turnEnd", priorState)
+      ? await this.#runTurnEvent(scene, priorTokenId, "turnEnd")
+      : null;
+    const turnStart = this.#claimCombatEvent(combat, "turnStart", currentState)
+      ? await this.#runTurnEvent(scene, currentTokenId, "turnStart")
+      : null;
+    const report = { sceneId: scene.id, forward: true, turnEnd, turnStart };
+    this.lastReport = { ...(this.lastReport ?? {}), combatTurn: clone(report), timestamp: Date.now() };
+    return report;
+  }
+
+  async handleCombatStart(combat, updateData = {}) {
+    const scene = combat?.scene ?? this.gameRef?.scenes?.get?.(combat?.scene?.id ?? combat?.sceneId) ?? globalThis.canvas?.scene ?? null;
+    if (!scene?.id || !isRuntimeCoordinator(this.gameRef)) return null;
+    const turnIndex = Number(updateData?.turn ?? combat?.turn ?? 0);
+    const turns = combat?.turns?.contents ?? combat?.turns ?? [];
+    const combatant = turns?.[turnIndex] ?? combat?.combatant ?? null;
+    const tokenId = combatant?.tokenId ?? combatant?.token?.id ?? combatant?.token?.document?.id ?? null;
+    const state = { round: Number(updateData?.round ?? combat?.round ?? 1), turn: turnIndex, tokenId };
+    const turnStart = this.#claimCombatEvent(combat, "turnStart", state)
+      ? await this.#runTurnEvent(scene, tokenId, "turnStart")
+      : null;
+    const report = { sceneId: scene.id, turnStart };
+    this.lastReport = { ...(this.lastReport ?? {}), combatStart: clone(report), timestamp: Date.now() };
+    return report;
+  }
+
+  async #reconcileSceneNow(scene, { seed = false, fireEvents = true } = {}) {
     if (!scene?.id) return null;
     const firstRun = !this.initializedScenes.has(scene.id);
     const shouldSeed = seed || firstRun;
     const emitters = await this.#emitters(scene);
-    const desired = new Map();
+    const targetsByEmitter = new Map();
     const currentByEmitter = new Map();
 
     for (const emitter of emitters) {
       const targets = this.#currentTargets(emitter);
+      targetsByEmitter.set(emitter.key, targets);
       currentByEmitter.set(emitter.key, new Set(targets.map((entry) => entry.token.id)));
-      this.#desiredPresence(emitter, targets, desired);
     }
 
-    const presencePlan = this.#planPresence(scene, desired);
-    // Presence that is no longer valid is removed before leave triggers run.
-    // Enter triggers (including interactive saves) run before new presence Items
-    // are created, so a document-preparation problem in a target inventory cannot
-    // suppress the transition itself.
-    const presenceRemove = await this.#removePresence(presencePlan);
+    // Discrete events run first. This matters when an enter/save grants
+    // temporary immunity which is configured to suppress the continuous
+    // presence effect as well.
     const transitions = await this.#processTransitions(scene, emitters, currentByEmitter, {
       seed: shouldSeed,
       fireEvents
     });
-    const presenceAdd = await this.#addPresence(presencePlan, presenceRemove.failedRemoveKeys);
-    const presence = {
-      desired: presencePlan.desired,
-      applied: presenceAdd.applied,
-      removed: presenceRemove.removed,
-      errors: [...presenceRemove.errors, ...presenceAdd.errors]
-    };
+
+    const presence = await this.#reconcilePresencePhase(scene, { emitters, targetsByEmitter });
     this.initializedScenes.add(scene.id);
     this.lastReport = {
       sceneId: scene.id,
@@ -385,8 +634,35 @@ export class AuraRuntimeEngine {
     return clone(this.lastReport);
   }
 
+  async #queueSceneOperation(scene, operation) {
+    if (!scene?.id) return null;
+    const sceneId = scene.id;
+    const previous = this.reconcileQueues.get(sceneId) ?? Promise.resolve();
+    const run = previous
+      .catch(() => undefined)
+      .then(operation);
+    this.reconcileQueues.set(sceneId, run);
+    try {
+      return await run;
+    } finally {
+      if (this.reconcileQueues.get(sceneId) === run) this.reconcileQueues.delete(sceneId);
+    }
+  }
+
+  async reconcileScene(scene, options = {}) {
+    return this.#queueSceneOperation(scene, () => this.#reconcileSceneNow(scene, options));
+  }
+
+  async reconcilePresence(scene) {
+    return this.#queueSceneOperation(scene, () => this.#reconcilePresencePhase(scene));
+  }
+
   async deactivateScene(scene) {
     if (!scene?.id) return { removed: 0 };
+    const pending = this.reconcileQueues.get(scene.id);
+    if (pending) {
+      try { await pending; } catch { /* cleanup still proceeds */ }
+    }
     const actors = uniqueActors(scene, this.gameRef);
     const active = collectPresenceBindings(actors, { sceneId: scene.id });
     let removed = 0;

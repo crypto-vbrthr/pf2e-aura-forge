@@ -38,6 +38,15 @@ class MockActor {
   }
   isAllyOf(other) { return this !== other && this.alliance === other?.alliance && this.alliance !== "neutral"; }
   isEnemyOf(other) { return this.alliance !== "neutral" && other?.alliance !== "neutral" && this.alliance !== other.alliance; }
+  async createEmbeddedDocuments(_type, sources) {
+    return sources.map((source, index) => {
+      const item = new MockItem(`embedded.${this.items.length + index + 1}`, source, this);
+      item.type = source.type;
+      item.system = structuredClone(source.system ?? {});
+      this.items.push(item);
+      return item;
+    });
+  }
   async deleteEmbeddedDocuments(_type, ids) {
     this.items = this.items.filter((item) => !ids.includes(item.id));
     return ids;
@@ -67,7 +76,14 @@ function effect(id, name = id) {
   };
 }
 
-function setup({ saveEnter = false, saveMode = "request", saveDegree = 2 } = {}) {
+function setup({
+  saveEnter = false,
+  saveMode = "request",
+  saveDegree = 2,
+  enterImmunity = null,
+  turnStart = false,
+  turnEnd = false
+} = {}) {
   const sourceActor = new MockActor("source", "opposition");
   const targetActor = new MockActor("target", "party");
   const saveCalls = [];
@@ -111,9 +127,22 @@ function setup({ saveEnter = false, saveMode = "request", saveDegree = 2 } = {})
         event: "leave",
         save: { enabled: false },
         outcomes: { success: effect("leave.effect", "Leave Effect") }
-      }
+      },
+      ...(turnStart ? [{
+        id: "trigger.turn-start",
+        event: "turnStart",
+        save: { enabled: true, type: "fortitude", mode: saveMode, dc: { value: 22 } },
+        outcomes: { failure: effect("turn-start.failure", "Turn Start Failure"), success: effect("turn-start.success", "Turn Start Success") }
+      }] : []),
+      ...(turnEnd ? [{
+        id: "trigger.turn-end",
+        event: "turnEnd",
+        save: { enabled: false },
+        outcomes: { success: effect("turn-end.effect", "Turn End Effect") }
+      }] : [])
     ]
   });
+  if (enterImmunity) aura.triggers[0].immunity = structuredClone(enterImmunity);
   const instance = { id: "instance.1", definitionId: aura.id, enabled: true, overrides: {} };
   const actorAuras = {
     list(actor) { return actor === sourceActor ? [instance] : []; },
@@ -142,7 +171,12 @@ function setup({ saveEnter = false, saveMode = "request", saveDegree = 2 } = {})
       }
     }
   };
-  const gameRef = { user: USER, actors: { contents: [sourceActor, targetActor, allyActor] } };
+  const gameRef = {
+    user: USER,
+    actors: { contents: [sourceActor, targetActor, allyActor] },
+    time: { worldTime: 1000 },
+    combat: null
+  };
   const runtime = new AuraRuntimeEngine({
     library: { async get() { return structuredClone(aura); } },
     actorAuras,
@@ -303,4 +337,276 @@ test("GM runtime coordinator routes request-mode saves through the socket servic
   assert.equal(requests.length, 1);
   assert.equal(report.transitions.savesResolved, 1);
   assert.equal(calls.filter((call) => call.definition.id === "enter.failure").length, 1);
+});
+
+test("temporary immunity is applied after a configured save degree and suppresses a later enter trigger", async () => {
+  const state = setup({
+    saveEnter: true,
+    saveDegree: 1,
+    enterImmunity: {
+      enabled: true,
+      duration: { value: 1, unit: "minutes" },
+      scope: "ability",
+      applyOn: ["failure"]
+    }
+  });
+  const { runtime, scene, targetActor, targetToken, saveCalls } = state;
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+
+  targetToken.x = 200;
+  let report = await runtime.reconcileScene(scene, { fireEvents: true });
+  assert.equal(report.transitions.savesResolved, 1);
+  assert.equal(report.transitions.immunityApplied, 1);
+  assert.equal(saveCalls.length, 1);
+  assert.equal(targetActor.items.some((item) => item.flags?.["pf2e-aura-forge"]?.auraImmunity), true);
+
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { fireEvents: true });
+  targetToken.x = 200;
+  report = await runtime.reconcileScene(scene, { fireEvents: true });
+  assert.equal(report.transitions.immunitySkipped, 1);
+  assert.equal(report.transitions.savesResolved, 0);
+  assert.equal(saveCalls.length, 1);
+});
+
+test("world-time expiry makes a temporary minute immunity eligible again", async () => {
+  const state = setup({
+    saveEnter: true,
+    saveDegree: 1,
+    enterImmunity: {
+      enabled: true,
+      duration: { value: 1, unit: "minutes" },
+      scope: "ability",
+      applyOn: ["failure"]
+    }
+  });
+  const { runtime, scene, targetToken, saveCalls } = state;
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  targetToken.x = 200;
+  await runtime.reconcileScene(scene, { fireEvents: true });
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { fireEvents: true });
+
+  runtime.gameRef.time.worldTime += 61;
+  targetToken.x = 200;
+  const report = await runtime.reconcileScene(scene, { fireEvents: true });
+  assert.equal(report.transitions.savesResolved, 1);
+  assert.equal(report.transitions.immunityApplied, 1);
+  assert.equal(saveCalls.length, 2);
+});
+
+test("combat turn change fires turnEnd for the prior token and turnStart for the current token", async () => {
+  const state = setup({ turnStart: true, turnEnd: true, saveDegree: 1 });
+  const { runtime, scene, targetToken, allyToken, calls, saveCalls } = state;
+  const combat = { id: "combat.1", scene };
+
+  const endReport = await runtime.handleCombatTurnChange(
+    combat,
+    { round: 1, turn: 0, tokenId: targetToken.id },
+    { round: 1, turn: 1, tokenId: allyToken.id }
+  );
+  assert.equal(endReport.forward, true);
+  assert.equal(endReport.turnEnd.triggerEffects, 1);
+  assert.equal(calls.filter((call) => call.definition.id === "turn-end.effect").length, 1);
+
+  const startReport = await runtime.handleCombatTurnChange(
+    combat,
+    { round: 1, turn: 1, tokenId: allyToken.id },
+    { round: 1, turn: 2, tokenId: targetToken.id }
+  );
+  assert.equal(startReport.turnStart.savesResolved, 1);
+  assert.equal(saveCalls.length, 1);
+  assert.equal(calls.filter((call) => call.definition.id === "turn-start.failure").length, 1);
+});
+
+test("combat turn events are deduplicated and rewinding initiative does not replay aura triggers", async () => {
+  const state = setup({ turnEnd: true });
+  const { runtime, scene, targetToken, allyToken, calls } = state;
+  const combat = { id: "combat.2", scene };
+  const prior = { round: 2, turn: 0, tokenId: targetToken.id };
+  const current = { round: 2, turn: 1, tokenId: allyToken.id };
+
+  await runtime.handleCombatTurnChange(combat, prior, current);
+  await runtime.handleCombatTurnChange(combat, prior, current);
+  assert.equal(calls.filter((call) => call.definition.id === "turn-end.effect").length, 1);
+
+  const reverse = await runtime.handleCombatTurnChange(combat, current, prior);
+  assert.equal(reverse.forward, false);
+  assert.equal(calls.filter((call) => call.definition.id === "turn-end.effect").length, 1);
+});
+
+test("temporary immunity is not created when the resolved degree is not listed in applyOn", async () => {
+  const state = setup({
+    saveEnter: true,
+    saveDegree: 2,
+    enterImmunity: {
+      enabled: true,
+      duration: { value: 1, unit: "minutes" },
+      scope: "ability",
+      applyOn: ["criticalSuccess"]
+    }
+  });
+  const { runtime, scene, targetActor, targetToken } = state;
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  targetToken.x = 200;
+  const report = await runtime.reconcileScene(scene, { fireEvents: true });
+  assert.equal(report.transitions.savesResolved, 1);
+  assert.equal(report.transitions.immunityApplied, 0);
+  assert.equal(targetActor.items.some((item) => item.flags?.["pf2e-aura-forge"]?.auraImmunity), false);
+});
+
+test("combat start fires the first combatant turnStart once and deduplicates a matching turn-change event", async () => {
+  const state = setup({ turnStart: true, saveDegree: 1 });
+  const { runtime, scene, targetToken, calls, saveCalls } = state;
+  const combat = {
+    id: "combat.start",
+    scene,
+    turns: [{ tokenId: targetToken.id }]
+  };
+  await runtime.handleCombatStart(combat, { round: 1, turn: 0 });
+  assert.equal(saveCalls.length, 1);
+  assert.equal(calls.filter((call) => call.definition.id === "turn-start.failure").length, 1);
+
+  await runtime.handleCombatTurnChange(
+    combat,
+    { round: 0, turn: null, tokenId: null },
+    { round: 1, turn: 0, tokenId: targetToken.id }
+  );
+  assert.equal(saveCalls.length, 1);
+  assert.equal(calls.filter((call) => call.definition.id === "turn-start.failure").length, 1);
+});
+
+
+test("concurrent reconciliation cannot create duplicate presence Items", async () => {
+  const state = setup();
+  const { runtime, scene, targetActor } = state;
+  await Promise.all([
+    runtime.reconcileScene(scene, { seed: true, fireEvents: false }),
+    runtime.reconcileScene(scene, { seed: true, fireEvents: false })
+  ]);
+  assert.equal(presenceItems(targetActor).length, 1);
+});
+
+test("temporary whole-aura immunity suppresses the presence effect immediately after enter", async () => {
+  const state = setup({
+    saveEnter: true,
+    saveDegree: 1,
+    enterImmunity: {
+      enabled: true,
+      duration: { value: 1, unit: "minutes" },
+      scope: "ability",
+      applyOn: ["failure"]
+    }
+  });
+  const { runtime, scene, targetActor, targetToken } = state;
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  targetToken.x = 200;
+  const report = await runtime.reconcileScene(scene, { fireEvents: true });
+
+  assert.equal(report.transitions.immunityApplied, 1);
+  assert.equal(presenceItems(targetActor).length, 0);
+});
+
+test("event-only temporary immunity can leave the presence effect active", async () => {
+  const state = setup({
+    saveEnter: true,
+    saveDegree: 1,
+    enterImmunity: {
+      enabled: true,
+      blocksPresence: false,
+      duration: { value: 1, unit: "minutes" },
+      scope: "ability",
+      applyOn: ["failure"]
+    }
+  });
+  const { runtime, scene, targetActor, targetToken } = state;
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  targetToken.x = 200;
+  await runtime.reconcileScene(scene, { fireEvents: true });
+
+  assert.equal(presenceItems(targetActor).length, 1);
+});
+
+test("combat turn history without tokenId resolves combatants from the turn index", async () => {
+  const state = setup({ turnStart: true, turnEnd: true, saveDegree: 1 });
+  const { runtime, scene, targetToken, allyToken, calls } = state;
+  const combat = {
+    id: "combat.turn-index",
+    scene,
+    turns: [
+      { id: "c-target", tokenId: targetToken.id },
+      { id: "c-ally", tokenId: allyToken.id }
+    ]
+  };
+
+  const report = await runtime.handleCombatTurnChange(
+    combat,
+    { round: 1, turn: 0, tokenId: null },
+    { round: 1, turn: 1, tokenId: null }
+  );
+  assert.equal(report.turnEnd.tokenId, targetToken.id);
+  assert.equal(report.turnEnd.triggerEffects, 1);
+  assert.equal(calls.filter((call) => call.definition.id === "turn-end.effect").length, 1);
+});
+
+test("turn-end immunity removes an already active presence effect immediately", async () => {
+  const state = setup({ turnEnd: true });
+  const { runtime, aura, scene, targetActor, targetToken, allyToken } = state;
+  const turnEndTrigger = aura.triggers.find((trigger) => trigger.event === "turnEnd");
+  turnEndTrigger.immunity = {
+    enabled: true,
+    blocksPresence: true,
+    duration: { value: 1, unit: "minutes" },
+    scope: "ability",
+    applyOn: ["success"]
+  };
+
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  assert.equal(presenceItems(targetActor).length, 1);
+
+  const combat = { id: "combat.presence-immunity", scene };
+  const report = await runtime.handleCombatTurnChange(
+    combat,
+    { round: 1, turn: 0, tokenId: targetToken.id },
+    { round: 1, turn: 1, tokenId: allyToken.id }
+  );
+
+  assert.equal(report.turnEnd.immunityApplied, 1);
+  assert.equal(report.turnEnd.presence.removed, 1);
+  assert.equal(presenceItems(targetActor).length, 0);
+});
+
+test("expired immunity is cleaned and presence returns while the target remains inside", async () => {
+  const state = setup({ turnEnd: true });
+  const { runtime, aura, scene, targetActor, targetToken, allyToken } = state;
+  const turnEndTrigger = aura.triggers.find((trigger) => trigger.event === "turnEnd");
+  turnEndTrigger.immunity = {
+    enabled: true,
+    blocksPresence: true,
+    duration: { value: 1, unit: "minutes" },
+    scope: "ability",
+    applyOn: ["success"]
+  };
+
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  const combat = { id: "combat.expiry-presence", scene };
+  await runtime.handleCombatTurnChange(
+    combat,
+    { round: 1, turn: 0, tokenId: targetToken.id },
+    { round: 1, turn: 1, tokenId: allyToken.id }
+  );
+  assert.equal(presenceItems(targetActor).length, 0);
+  assert.equal(targetActor.items.some((item) => item.flags?.["pf2e-aura-forge"]?.auraImmunity), true);
+
+  runtime.gameRef.time.worldTime += 61;
+  const report = await runtime.reconcileScene(scene, { fireEvents: false });
+
+  assert.equal(report.presence.expiredImmunitiesRemoved, 1);
+  assert.equal(targetActor.items.some((item) => item.flags?.["pf2e-aura-forge"]?.auraImmunity), false);
+  assert.equal(presenceItems(targetActor).length, 1);
 });

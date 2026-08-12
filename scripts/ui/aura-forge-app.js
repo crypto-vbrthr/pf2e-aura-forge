@@ -69,6 +69,7 @@ export function syncTriggerDraftFromCard(trigger, card) {
   trigger.immunity.duration.value = Number(card.querySelector('[name="immunityValue"]')?.value ?? trigger.immunity.duration.value);
   trigger.immunity.duration.unit = card.querySelector('[name="immunityUnit"]')?.value ?? trigger.immunity.duration.unit;
   trigger.immunity.scope = card.querySelector('[name="immunityScope"]')?.value ?? trigger.immunity.scope;
+  trigger.immunity.blocksPresence = Boolean(card.querySelector('[name="immunityBlocksPresence"]')?.checked);
   trigger.immunity.applyOn = [...(card.querySelectorAll?.('[data-immunity-degree]:checked') ?? [])]
     .map((input) => input.dataset.immunityDegree)
     .filter(Boolean);
@@ -191,8 +192,11 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       isEditing: this.activeEffectRef === `presence:${entry.id}`
     }));
 
+    const hasPresenceEffects = draft.presenceEffects.length > 0;
     const triggers = draft.triggers.map((trigger) => ({
       ...trigger,
+      hasPresenceEffects,
+      presenceInteractionHint: hasPresenceEffects && trigger.immunity.enabled && trigger.immunity.blocksPresence,
       eventOptions: optionList(AURA_TRIGGER_EVENTS, trigger.event, "PF2E_AURA_FORGE.TriggerEvents"),
       saveTypeOptions: optionList(SAVE_TYPES, trigger.save.type, "PF2E_AURA_FORGE.SaveTypes"),
       saveModeOptions: optionList(SAVE_MODES, trigger.save.mode, "PF2E_AURA_FORGE.SaveModes"),
@@ -452,6 +456,9 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const immunityEnabled = Boolean(card.querySelector('[name="immunityEnabled"]')?.checked);
       const immunityConfig = card.querySelector("[data-immunity-config]");
       if (immunityConfig) immunityConfig.hidden = !immunityEnabled;
+      const blocksPresence = Boolean(card.querySelector('[name="immunityBlocksPresence"]')?.checked);
+      const presenceHint = card.querySelector("[data-immunity-presence-hint]");
+      if (presenceHint) presenceHint.hidden = !(immunityEnabled && blocksPresence);
     }
   }
 

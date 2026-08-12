@@ -39,3 +39,15 @@ test("trigger form synchronization scopes itself to trigger cards, not nested ac
   assert.match(source, /querySelectorAll\("\.trigger-card\[data-trigger-id\]"\)/);
   assert.doesNotMatch(source, /for \(const card of container\.querySelectorAll\("\[data-trigger-id\]"\)\)/);
 });
+
+
+test("temporary immunity exposes an explicit presence-suppression option", () => {
+  assert.match(templateSource, /name="immunityBlocksPresence"/);
+  assert.match(source, /trigger\.immunity\.blocksPresence/);
+});
+
+test("presence-blocking immunity explains immediate removal and later restoration semantics", () => {
+  assert.match(templateSource, /data-immunity-presence-hint/);
+  assert.match(source, /presenceInteractionHint/);
+  assert.match(source, /immunityBlocksPresence/);
+});

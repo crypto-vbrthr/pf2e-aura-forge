@@ -126,6 +126,9 @@
     "RadiusOverride": "Radius override (feet)",
     "DropActor": "Drop actor here",
     "DropActorHint": "Drag an actor from the Actor Directory into this area to assign the aura.",
-    "DirectTriggerHint": "Without a saving throw, runtime uses the Success effect as the direct event effect. Saving throws are now resolved by the runtime for enter/leave events; temporary immunity plus turn-start/turn-end follow in the next runtime milestone."
+    "DirectTriggerHint": "Without a saving throw, runtime uses the Success effect as the direct event effect. Enter, leave, turn start, and turn end are executed automatically. Temporary immunities are tracked as visible PF2e effects and suppress further event effects from the matching aura while active.",
+    "ImmunityEffectName": "Aura immunity",
+    "ImmunityBlocksPresence": "Immunity also suppresses presence effects",
+    "ImmunityPresenceInteractionHint": "When this immunity is granted, matching presence effects are removed immediately. When the immunity expires, they are applied again if the target is still inside the aura."
   }
 }

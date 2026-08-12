@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.4.2
+
+### Presence / Immunity Reconciliation Hardening
+- Established the runtime ordering contract: discrete aura events resolve completely before continuous Presence Effects are reconciled.
+- Turn-start and turn-end events now reconcile Presence Effects immediately after their outcomes and temporary-immunity changes. A newly granted presence-blocking immunity therefore removes an already active Presence Effect in the same turn event.
+- Presence reconciliation now cleans expired managed immunity Effects before calculating desired Presence state. If an immunity expires while the target remains in the aura, the Presence Effect is restored automatically.
+- Added Foundry world-time reconciliation so minute/hour/day fallback expiry does not require token movement or another aura event.
+- Added managed-immunity Item create/update/delete hooks so PF2e effect expiry/removal immediately refreshes Presence state, including round-based immunity cleanup.
+- Added an editor hint explaining that presence-blocking immunity removes Presence Effects immediately and allows them to return after immunity expires while the target remains inside.
+- Added regression coverage for later turn-bound immunity removing existing Presence Effects, expiry restoring Presence, world-time refresh, managed-immunity Item changes, and the editor interaction hint.
+
+## 0.4.1
+
+### Combat and Presence Hardening
+- Added a Combat update fallback alongside `combatTurnChange` and improved combatant/token reconstruction for turn-start and turn-end events.
+- Serialized scene reconciliation to prevent duplicate Presence Effect creation from overlapping runtime hooks.
+- Temporary immunity can explicitly suppress Presence Effects, with suppression enabled by default while event-only immunity remains available as an opt-out.
+
+## 0.4.0
+
+### Turn Start / Turn End + Temporary Immunity
+- Added `turnStart` and `turnEnd` runtime execution using Foundry v14 combat turn history. Turn-end is processed for the prior combatant before turn-start is processed for the new combatant.
+- Added combat-start handling for the first turn, plus deduplication so combat start and turn-change hooks cannot fire the same turn-start trigger twice. Initiative rewinds do not replay aura trigger side effects.
+- Turn-bound triggers use the same save routing as enter/leave, including player request, automatic roll, GM request, degree-of-success outcomes, and socket routing.
+- Added managed temporary aura-immunity PF2e Effect Items with instance/source/ability scope. Immunity is applied only on configured degrees of success and suppresses all further event triggers from the matching aura while active.
+- Minute/hour/day immunities include a world-time expiry fallback; round-based immunities follow PF2e effect-expiry state.
+- Expired managed immunities are cleaned before event processing when the current client can update the Actor.
+- Added runtime diagnostics for immunity application, immunity skips, and immunity errors.
+- Added regression coverage for turn-start/turn-end execution, deduplication, rewind suppression, immunity scopes, expiry, and cross-trigger immunity blocking.
+
 ## 0.3.4
 
 ### Remote save routing and PF2e actor-data compatibility

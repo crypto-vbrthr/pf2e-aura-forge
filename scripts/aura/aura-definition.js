@@ -61,6 +61,7 @@ export function createImmunityDefinition(overrides = {}) {
       ...clone(duration)
     },
     scope: "ability",
+    blocksPresence: true,
     applyOn: ["criticalSuccess", "success"],
     ...clone(overrides),
     duration: {

@@ -69,3 +69,16 @@ test("cloneAuraDefinition with newIdentity remaps nested entry ids", () => {
   assert.notEqual(copy.triggers[0].outcomes.failure.id, original.triggers[0].outcomes.failure.id);
   assert.equal(copy.name, "A Copy");
 });
+
+
+test("temporary immunity blocks presence effects by default but can opt out", () => {
+  const defaultAura = createAuraDefinition({
+    triggers: [createAuraTrigger({ immunity: { enabled: true } })]
+  });
+  assert.equal(defaultAura.triggers[0].immunity.blocksPresence, true);
+
+  const eventOnly = createAuraDefinition({
+    triggers: [createAuraTrigger({ immunity: { enabled: true, blocksPresence: false } })]
+  });
+  assert.equal(eventOnly.triggers[0].immunity.blocksPresence, false);
+});

@@ -2,7 +2,7 @@
   "id": "pf2e-aura-forge",
   "title": "PF2E Aura Forge",
   "description": "Builds and manages reusable PF2e aura definitions with presence effects, event triggers, saving throws, immunity rules, and the embedded Effect Forge editor.",
-  "version": "0.3.4",
+  "version": "0.4.2",
   "authors": [
     {
       "name": "crypto-vbrthr"

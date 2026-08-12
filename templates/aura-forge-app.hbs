@@ -168,7 +168,11 @@
                       <label><span>{{localize "PF2E_AURA_FORGE.Duration"}}</span><input name="immunityValue" type="number" min="1" value="{{trigger.immunity.duration.value}}"></label>
                       <label><span>{{localize "PF2E_AURA_FORGE.Unit"}}</span><select name="immunityUnit"><option value="rounds" {{#if (eq trigger.immunity.duration.unit "rounds")}}selected{{/if}}>{{localize "PF2E_AURA_FORGE.DurationUnits.rounds"}}</option><option value="minutes" {{#if (eq trigger.immunity.duration.unit "minutes")}}selected{{/if}}>{{localize "PF2E_AURA_FORGE.DurationUnits.minutes"}}</option><option value="hours" {{#if (eq trigger.immunity.duration.unit "hours")}}selected{{/if}}>{{localize "PF2E_AURA_FORGE.DurationUnits.hours"}}</option><option value="days" {{#if (eq trigger.immunity.duration.unit "days")}}selected{{/if}}>{{localize "PF2E_AURA_FORGE.DurationUnits.days"}}</option></select></label>
                       <label><span>{{localize "PF2E_AURA_FORGE.Scope"}}</span><select name="immunityScope">{{#each trigger.immunityScopeOptions as |option|}}<option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>{{/each}}</select></label>
+                      <label class="checkbox-row immunity-presence-row"><input name="immunityBlocksPresence" type="checkbox" {{#if trigger.immunity.blocksPresence}}checked{{/if}}><span>{{localize "PF2E_AURA_FORGE.ImmunityBlocksPresence"}}</span></label>
                     </div>
+                    {{#if trigger.hasPresenceEffects}}
+                      <p class="aura-forge-muted immunity-presence-hint" data-immunity-presence-hint {{#unless trigger.presenceInteractionHint}}hidden{{/unless}}><i class="fa-solid fa-circle-info"></i> {{localize "PF2E_AURA_FORGE.ImmunityPresenceInteractionHint"}}</p>
+                    {{/if}}
                     <div class="degree-checkboxes">{{#each trigger.applyOn as |entry|}}<label class="checkbox-row"><input type="checkbox" data-immunity-degree="{{entry.degree}}" {{#if entry.checked}}checked{{/if}}><span>{{entry.label}}</span></label>{{/each}}</div>
                   </div>
                 </div>

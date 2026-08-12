@@ -15,8 +15,9 @@ Actor
 Aura Runtime Engine
 ├── resolve active Actor instances on scene source tokens
 ├── spatial + target eligibility
+├── discrete enter/leave/turnStart/turnEnd event processing
+├── temporary-immunity lifecycle
 ├── desired Presence Effect reconciliation
-├── enter/leave occupancy transitions
 └── Effect Forge public application API
 ```
 
@@ -61,7 +62,17 @@ If the embedded Effect Definition changes, its fingerprint changes. The stale bo
 
 The engine keeps in-memory occupancy per scene/source-token/instance. Initial scene reconciliation seeds occupancy and therefore does not synthesize `enter` effects for creatures already inside after a reload. Subsequent movement reconciliations compare previous and current occupancy and execute `enter`/`leave` trigger effects.
 
-A trigger without a saving throw uses its `success` outcome as the direct event effect. Save-enabled `enter`/`leave` triggers resolve through the native PF2e saving-throw statistic and dispatch the matching degree-of-success outcome. One deterministic runtime coordinator detects transition side effects. In `request` mode it sends a module-socket request to an active non-GM user assigned to or owning the target Actor when possible; the player returns only the resolved degree/status and the coordinator applies the matching Effect Forge outcome exactly once. `automatic` and GM-request modes prefer the selected active GM. This routing is deliberately separate from PF2e `primaryUpdater`, which remains the authority for Actor document mutation. Vanishing/disabled emitters clean Presence Effects but do not synthesize a `leave` event. Temporary immunity and turn-bound triggers remain a later runtime layer.
+A trigger without a saving throw uses its `success` outcome as the direct event effect. Save-enabled event triggers resolve through the native PF2e saving-throw statistic and dispatch the matching degree-of-success outcome. One deterministic runtime coordinator detects transition side effects. In `request` mode it sends a module-socket request to an active non-GM user assigned to or owning the target Actor when possible; the player returns only the resolved degree/status and the coordinator applies the matching Effect Forge outcome exactly once. `automatic` and GM-request modes prefer the selected active GM. This routing is deliberately separate from PF2e `primaryUpdater`, which remains the authority for Actor document mutation. Vanishing/disabled emitters clean Presence Effects but do not synthesize a `leave` event. Turn-bound triggers use Foundry v14 combat turn history: the prior combatant receives `turnEnd` processing and the new combatant receives `turnStart` processing, with deduplication and rewind suppression. Temporary immunity is persisted as a managed PF2e Effect Item. Its scope key can bind to one aura instance, one source, or one ability key; matching immunity blocks all event triggers from that aura while it remains active.
+
+### Event / Presence ordering contract
+
+Discrete events always finish before continuous Presence state is reconciled:
+
+```text
+event → save → degree outcome → immunity mutation → Presence reconciliation
+```
+
+If a trigger grants immunity with `blocksPresence: true`, an already active Presence Effect is removed immediately after that event. If the immunity is granted on `enter`, Presence is never created in the first place. When the immunity expires or its managed PF2e Effect Item is removed while the target remains inside the aura, Presence is recalculated and restored automatically. `blocksPresence: false` keeps the older event-only immunity semantics.
 
 ## Multi-client ownership
 
@@ -75,6 +86,8 @@ Coordinate-bearing `updateToken` hooks are treated as transition-capable on ever
 - `createToken`: reconcile and permit an enter transition after the scene has been seeded.
 - `deleteToken`: reconcile cleanup without synthetic leave.
 - `updateActor`: reconcile active-scene relationship/instance changes without synthetic transitions.
+- Managed temporary-immunity Item create/update/delete: refresh Presence state without changing occupancy.
+- `updateWorldTime`: refresh Presence state so minute/hour/day fallback expiry can remove stale immunity and restore Presence without token movement.
 - Aura Library setting updates: reconcile current definitions without synthetic transitions.
 - `canvasTearDown`: remove Presence Effects belonging to the scene and clear occupancy state.
 

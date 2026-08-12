@@ -1,6 +1,6 @@
 # PF2E Aura Forge
 
-Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 0.3.4 hardens the live **Presence Effects + Enter/Leave** runtime with explicit cross-client saving-throw routing and PF2e Actor-data compatibility checks.
+Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 0.4.2 hardens the full aura runtime, including Presence Effects, enter/leave, turn-start/turn-end, saving throws, and temporary-immunity reconciliation.
 
 ## Included
 
@@ -64,7 +64,7 @@ matching Tokens inside range
 
 The runtime prefers PF2e's Token placeable `distanceTo()` measurement, matching the system's own initial aura range check. A rectangle/grid fallback exists for degraded/test contexts. Presence effects are forced to unlimited global duration because their lifetime is controlled by aura membership, then removed by their exact Aura Forge binding when no longer desired. The binding is inserted into the Effect Definition metadata before Critical Forge creates the PF2e Effect Item, avoiding a second Actor/Item update solely for runtime tagging.
 
-For a trigger **without** a saving throw, the `success` outcome slot is the direct event effect. For a trigger **with** a saving throw, the runtime coordinator routes the roll to the correct client, that client calls the target Actor's native PF2e save statistic, and the resulting degree is returned to the coordinator before the matching Effect Forge outcome is applied. Temporary immunity, `turnStart`, and `turnEnd` execution remain later runtime blocks.
+For a trigger **without** a saving throw, the `success` outcome slot is the direct event effect. For a trigger **with** a saving throw, the runtime coordinator routes the roll to the correct client, that client calls the target Actor's native PF2e save statistic, and the resulting degree is returned to the coordinator before the matching Effect Forge outcome is applied. Temporary immunity, `turnStart`, and `turnEnd` are executed by the runtime. Aura Forge treats discrete events and continuous Presence state as two phases: event outcomes and immunity changes complete first, then Presence Effects are reconciled from current aura membership and immunity state. A newly granted presence-blocking immunity therefore removes an already active Presence Effect immediately; when that immunity expires, the Presence Effect returns automatically if the target is still inside the aura. Foundry world-time changes and managed immunity Item create/update/delete events also schedule non-event reconciliation so expiry does not depend on token movement. Temporary immunities are visible PF2e Effect Items with their configured duration and are checked before any event trigger from the matching aura is executed.
 
 ## Public API
 
@@ -83,7 +83,7 @@ console.log(api.engine.status());
 
 ## Current runtime boundary
 
-This release executes Presence Effects plus save/no-save `enter` and `leave` triggers. It does **not** yet execute turn-start/turn-end triggers or temporary immunity. It also does not yet reproduce PF2e's native aura-square wall/sensory-trait blocking; this block uses PF2e token distance for spatial membership.
+This release executes Presence Effects plus save/no-save `enter`, `leave`, `turnStart`, and `turnEnd` triggers. Temporary immunity can be granted on configured degrees of success, persists as a PF2e Effect Item, and blocks matching aura event triggers until it expires. Minute/hour/day immunity also has a world-time fallback check; round-based expiry follows PF2e effect-duration state. The runtime still does not reproduce PF2e's native aura-square wall/sensory-trait blocking; spatial membership uses PF2e token distance.
 
 ### Clean-install guard
 

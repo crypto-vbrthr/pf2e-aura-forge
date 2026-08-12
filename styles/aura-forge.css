@@ -188,3 +188,16 @@ button.danger { color:var(--color-level-error,#b33); }
   background:rgba(127,127,127,.10);
 }
 .actor-drop-zone.disabled { opacity:.55; }
+
+.aura-forge-app .immunity-presence-row {
+  grid-column: 1 / -1;
+  margin-top: 0.25rem;
+}
+
+.immunity-presence-hint {
+  margin: 0.45rem 0 0;
+  padding: 0.35rem 0.5rem;
+  border-left: 3px solid var(--color-level-info, var(--color-warm-2, #c58a3a));
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  border-radius: 3px;
+}
