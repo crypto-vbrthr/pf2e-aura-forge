@@ -92,7 +92,15 @@
       "EffectEditorFailed": "Der Embedded Effect Editor konnte nicht geladen werden.",
       "ValidationFailed": "Die Aura enthält noch ungültige Angaben.",
       "Saved": "Aura gespeichert.",
-      "NameRequired": "Bitte gib der Aura zuerst einen Namen."
+      "NameRequired": "Bitte gib der Aura zuerst einen Namen.",
+      "SaveBeforeAssign": "Speichere die Aura zuerst, bevor du sie einem Actor zuweist.",
+      "ActorRequired": "Bitte wähle einen Actor aus.",
+      "AlreadyAssigned": "Dieser Actor besitzt diese Aura bereits.",
+      "Assigned": "Aura wurde {actor} zugewiesen.",
+      "SelectOneToken": "Wähle genau einen Token aus.",
+      "WorldActorRequired": "Die Aura kann in diesem Schritt nur einem Welt-Actor zugewiesen werden.",
+      "DropActorRequired": "Ziehe bitte einen Actor aus dem Actor-Verzeichnis hierher.",
+      "AssignmentFailed": "Die Aura konnte dem Actor nicht zugewiesen werden."
     },
     "Dialogs": {
       "DiscardTitle": "Änderungen verwerfen?",
@@ -103,6 +111,20 @@
     "Settings": {
       "AuraLibrary": "Aura Forge Library",
       "WindowState": "Aura Forge Window State"
-    }
+    },
+    "ActorAssignment": "Actor-Zuordnung",
+    "ActorAssignmentHint": "Weise die gespeicherte Aura einem Actor als konkrete Aura-Instanz zu. Instanzen verweisen auf die zentrale Vorlage und können unabhängig aktiviert oder deaktiviert werden.",
+    "Actor": "Actor",
+    "SelectActor": "Actor auswählen",
+    "Assign": "Zuweisen",
+    "AssignSelectedToken": "Ausgewähltem Token zuweisen",
+    "SaveBeforeAssignHint": "Speichere Änderungen zuerst, bevor du die Aura zuweist.",
+    "NoAssignments": "Diese Aura ist derzeit keinem Actor zugewiesen.",
+    "SaveAuraToAssign": "Speichere die Aura zuerst, um sie Actors zuweisen zu können.",
+    "Active": "Aktiv",
+    "Inactive": "Inaktiv",
+    "RadiusOverride": "Radius-Override (Fuß)",
+    "DropActor": "Actor hierher ziehen",
+    "DropActorHint": "Ziehe einen Actor aus dem Actor-Verzeichnis in dieses Feld, um ihm die Aura zuzuweisen."
   }
 }

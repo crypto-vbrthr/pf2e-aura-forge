@@ -59,18 +59,48 @@
       "turnStart": "At turn start",
       "turnEnd": "At turn end"
     },
-    "SaveTypes": { "fortitude": "Fortitude", "reflex": "Reflex", "will": "Will" },
-    "SaveModes": { "request": "Request from player", "automatic": "Roll automatically", "gm": "GM request" },
-    "ImmunityScopes": { "instance": "This aura instance", "source": "This source", "ability": "This ability" },
-    "Degrees": { "criticalSuccess": "Critical Success", "success": "Success", "failure": "Failure", "criticalFailure": "Critical Failure" },
-    "DurationUnits": { "rounds": "Rounds", "minutes": "Minutes", "hours": "Hours", "days": "Days" },
+    "SaveTypes": {
+      "fortitude": "Fortitude",
+      "reflex": "Reflex",
+      "will": "Will"
+    },
+    "SaveModes": {
+      "request": "Request from player",
+      "automatic": "Roll automatically",
+      "gm": "GM request"
+    },
+    "ImmunityScopes": {
+      "instance": "This aura instance",
+      "source": "This source",
+      "ability": "This ability"
+    },
+    "Degrees": {
+      "criticalSuccess": "Critical Success",
+      "success": "Success",
+      "failure": "Failure",
+      "criticalFailure": "Critical Failure"
+    },
+    "DurationUnits": {
+      "rounds": "Rounds",
+      "minutes": "Minutes",
+      "hours": "Hours",
+      "days": "Days"
+    },
     "Notifications": {
       "GmOnly": "Aura Forge can only be opened by a GM.",
       "EffectForgeMissing": "Aura Forge requires a compatible PF2E Critical Forge / Effect Forge API.",
       "EffectEditorFailed": "The embedded Effect Editor could not be loaded.",
       "ValidationFailed": "The aura still contains invalid data.",
       "Saved": "Aura saved.",
-      "NameRequired": "Please give the aura a name first."
+      "NameRequired": "Please give the aura a name first.",
+      "SaveBeforeAssign": "Save the aura before assigning it to an Actor.",
+      "ActorRequired": "Please select an Actor.",
+      "AlreadyAssigned": "This Actor already has this aura.",
+      "Assigned": "Aura assigned to {actor}.",
+      "SelectOneToken": "Select exactly one token.",
+      "WorldActorRequired": "This step can only assign an aura to a world Actor.",
+      "DropActorRequired": "Please drop an actor from the Actor Directory here.",
+      "AssignmentFailed": "The aura could not be assigned to the actor."
     },
     "Dialogs": {
       "DiscardTitle": "Discard changes?",
@@ -78,6 +108,23 @@
       "DeleteTitle": "Delete aura?",
       "DeletePrompt": "The selected aura will be permanently removed from the Aura Library."
     },
-    "Settings": { "AuraLibrary": "Aura Forge Library", "WindowState": "Aura Forge Window State" }
+    "Settings": {
+      "AuraLibrary": "Aura Forge Library",
+      "WindowState": "Aura Forge Window State"
+    },
+    "ActorAssignment": "Actor Assignment",
+    "ActorAssignmentHint": "Assign the saved aura to an Actor as a concrete aura instance. Instances reference the central definition and can be enabled or disabled independently.",
+    "Actor": "Actor",
+    "SelectActor": "Select Actor",
+    "Assign": "Assign",
+    "AssignSelectedToken": "Assign to selected token",
+    "SaveBeforeAssignHint": "Save changes before assigning the aura.",
+    "NoAssignments": "This aura is not currently assigned to any Actor.",
+    "SaveAuraToAssign": "Save the aura first before assigning it to Actors.",
+    "Active": "Active",
+    "Inactive": "Inactive",
+    "RadiusOverride": "Radius override (feet)",
+    "DropActor": "Drop actor here",
+    "DropActorHint": "Drag an actor from the Actor Directory into this area to assign the aura."
   }
 }

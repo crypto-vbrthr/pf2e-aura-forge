@@ -60,6 +60,48 @@
         </div>
       </section>
 
+      <section class="aura-forge-section actor-assignment-section" data-instance-controls>
+        <header class="section-header">
+          <div><h2>{{localize "PF2E_AURA_FORGE.ActorAssignment"}}</h2><p>{{localize "PF2E_AURA_FORGE.ActorAssignmentHint"}}</p></div>
+        </header>
+        {{#if selectedAuraId}}
+          <div class="actor-assignment-controls">
+            <label class="grow"><span>{{localize "PF2E_AURA_FORGE.Actor"}}</span>
+              <select name="assignActorId" {{#unless canAssign}}disabled{{/unless}}>
+                <option value="">{{localize "PF2E_AURA_FORGE.SelectActor"}}</option>
+                {{#each actors as |actor|}}<option value="{{actor.id}}">{{actor.name}} ({{actor.type}})</option>{{/each}}
+              </select>
+            </label>
+            <button type="button" data-action="assignAura" {{#unless canAssign}}disabled{{/unless}}><i class="fa-solid fa-user-plus"></i> {{localize "PF2E_AURA_FORGE.Assign"}}</button>
+            <button type="button" data-action="assignSelectedToken" {{#unless canAssign}}disabled{{/unless}}><i class="fa-solid fa-bullseye"></i> {{localize "PF2E_AURA_FORGE.AssignSelectedToken"}}</button>
+          </div>
+          <div class="actor-drop-zone {{#unless canAssign}}disabled{{/unless}}" data-actor-drop-zone>
+            <i class="fa-solid fa-user-plus"></i>
+            <div><strong>{{localize "PF2E_AURA_FORGE.DropActor"}}</strong><span>{{localize "PF2E_AURA_FORGE.DropActorHint"}}</span></div>
+          </div>
+          {{#unless canAssign}}<p class="aura-forge-muted"><i class="fa-solid fa-floppy-disk"></i> {{localize "PF2E_AURA_FORGE.SaveBeforeAssignHint"}}</p>{{/unless}}
+          {{#if hasAssignments}}
+            <div class="actor-assignment-list">
+              {{#each assignments as |entry|}}
+                <div class="actor-assignment-row" data-actor-id="{{entry.actorId}}" data-instance-id="{{entry.instanceId}}">
+                  <div class="actor-assignment-name"><i class="fa-solid fa-user-shield"></i><strong>{{entry.actorName}}</strong><small>{{entry.actorType}}</small></div>
+                  <button type="button" data-action="toggleActorAura" data-actor-id="{{entry.actorId}}" data-instance-id="{{entry.instanceId}}" data-enabled="{{entry.enabled}}">
+                    <i class="fa-solid {{#if entry.enabled}}fa-toggle-on{{else}}fa-toggle-off{{/if}}"></i> {{#if entry.enabled}}{{localize "PF2E_AURA_FORGE.Active"}}{{else}}{{localize "PF2E_AURA_FORGE.Inactive"}}{{/if}}
+                  </button>
+                  <label class="radius-override"><span>{{localize "PF2E_AURA_FORGE.RadiusOverride"}}</span><input name="radiusOverride" type="number" min="1" step="5" value="{{entry.radiusOverride}}" placeholder="—"></label>
+                  <button type="button" data-action="updateRadiusOverride" data-actor-id="{{entry.actorId}}" data-instance-id="{{entry.instanceId}}"><i class="fa-solid fa-check"></i></button>
+                  <button type="button" class="danger" data-action="removeActorAura" data-actor-id="{{entry.actorId}}" data-instance-id="{{entry.instanceId}}"><i class="fa-solid fa-link-slash"></i></button>
+                </div>
+              {{/each}}
+            </div>
+          {{else}}
+            <p class="aura-forge-muted">{{localize "PF2E_AURA_FORGE.NoAssignments"}}</p>
+          {{/if}}
+        {{else}}
+          <p class="aura-forge-muted">{{localize "PF2E_AURA_FORGE.SaveAuraToAssign"}}</p>
+        {{/if}}
+      </section>
+
       <section class="aura-forge-section">
         <header class="section-header">
           <div><h2>{{localize "PF2E_AURA_FORGE.PresenceEffects"}}</h2><p>{{localize "PF2E_AURA_FORGE.PresenceEffectsHint"}}</p></div>

@@ -9,11 +9,16 @@ Hooks.once("init", () => {
   initializePublicApi({ openAuraForge });
 });
 
-Hooks.once("ready", () => {
+Hooks.once("ready", async () => {
   try {
     const effectApi = assertEffectForgeApi(getEffectForgeApi());
     initializeAuraForgeUi();
     const api = game.modules.get(MODULE_ID)?.api;
+    const reconciliation = await api?.instances?.reconcileAll?.();
+    const reconciliationErrors = (reconciliation ?? []).filter((entry) => entry.error);
+    if (reconciliationErrors.length > 0) {
+      console.warn(`${MODULE_ID} | Some actor aura abilities could not be reconciled.`, reconciliationErrors);
+    }
     Hooks.callAll("pf2eAuraForgeReady", api);
     console.info(`${MODULE_ID} | Ready`, {
       moduleVersion: api?.moduleVersion,

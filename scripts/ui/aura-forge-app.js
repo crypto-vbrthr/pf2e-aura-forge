@@ -15,6 +15,7 @@ import {
 } from "../aura/aura-definition.js";
 import { validateAuraDefinition } from "../aura/aura-validator.js";
 import { createFoundryAuraRepository } from "../aura/foundry-aura-repository.js";
+import { ActorAuraService } from "../actor/actor-aura-service.js";
 import {
   assertEffectForgeApi,
   createDefaultEmbeddedEffect,
@@ -89,6 +90,11 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       saveAura: AuraForgeApp.saveAura,
       duplicateAura: AuraForgeApp.duplicateAura,
       deleteAura: AuraForgeApp.deleteAura,
+      assignAura: AuraForgeApp.assignAura,
+      assignSelectedToken: AuraForgeApp.assignSelectedToken,
+      toggleActorAura: AuraForgeApp.toggleActorAura,
+      removeActorAura: AuraForgeApp.removeActorAura,
+      updateRadiusOverride: AuraForgeApp.updateRadiusOverride,
       addPresenceEffect: AuraForgeApp.addPresenceEffect,
       removePresenceEffect: AuraForgeApp.removePresenceEffect,
       editPresenceEffect: AuraForgeApp.editPresenceEffect,
@@ -114,6 +120,7 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
     super(foundry.utils.mergeObject({ position: savedPosition }, options, { inplace: false }));
     this.repository = createFoundryAuraRepository();
+    this.actorAuras = new ActorAuraService({ library: this.repository });
     this.auras = [];
     this.selectedAuraId = null;
     this.draft = createAuraDefinition();
@@ -183,6 +190,20 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       }))
     }));
 
+    const actors = [...(game.actors?.contents ?? [])]
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")))
+      .map((actor) => ({ id: actor.id, name: actor.name, type: actor.type }));
+    const assignmentRows = this.selectedAuraId
+      ? (await this.actorAuras.assignmentsForDefinition(this.selectedAuraId, game.actors?.contents ?? [])).map(({ actor, instance }) => ({
+          actorId: actor.id,
+          actorName: actor.name,
+          actorType: actor.type,
+          instanceId: instance.id,
+          enabled: instance.enabled,
+          radiusOverride: instance.overrides?.radius ?? ""
+        }))
+      : [];
+
     return {
       apiReady: compatibility.ready,
       effectApiVersion: compatibility.version,
@@ -203,7 +224,12 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       hasValidationWarnings: (this.validation?.warnings?.length ?? 0) > 0,
       activeEffectRef: this.activeEffectRef,
       selectedAuraId: this.selectedAuraId,
-      hasActiveEffectEditor: Boolean(this.activeEffectRef)
+      hasActiveEffectEditor: Boolean(this.activeEffectRef),
+      actors,
+      hasActors: actors.length > 0,
+      assignments: assignmentRows,
+      hasAssignments: assignmentRows.length > 0,
+      canAssign: Boolean(this.selectedAuraId && !this.isDirty)
     };
   }
 
@@ -213,7 +239,8 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!(root instanceof HTMLElement)) return;
 
     const auraFields = root.querySelector("[data-aura-fields]");
-    const sync = () => {
+    const sync = (event) => {
+      if (event?.target?.closest?.("[data-instance-controls]")) return;
       this.#syncDraftFromDom();
       this.#markDirty();
       this.#toggleConditionalControls(root);
@@ -221,12 +248,100 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     auraFields?.addEventListener("input", sync);
     auraFields?.addEventListener("change", sync);
     this.#toggleConditionalControls(root);
+    this.#setupActorDropZone(root);
     this.#mountEmbeddedEditor(root).catch((error) => {
       console.error(`${MODULE_ID} | Embedded Effect Editor mount failed.`, error);
       ui.notifications.error(game.i18n.localize("PF2E_AURA_FORGE.Notifications.EffectEditorFailed"));
     });
     this.#updateDirtyIndicator();
     this.#restoreScrollPositions();
+  }
+
+  #setupActorDropZone(root) {
+    const zone = root.querySelector("[data-actor-drop-zone]");
+    if (!(zone instanceof HTMLElement)) return;
+
+    const clearDragState = () => zone.classList.remove("drag-over");
+    zone.addEventListener("dragenter", (event) => {
+      event.preventDefault();
+      zone.classList.add("drag-over");
+    });
+    zone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+      zone.classList.add("drag-over");
+    });
+    zone.addEventListener("dragleave", (event) => {
+      if (!zone.contains(event.relatedTarget)) clearDragState();
+    });
+    zone.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      clearDragState();
+      try {
+        const actor = await this.#actorFromDropEvent(event);
+        if (!actor) {
+          ui.notifications.warn(game.i18n.localize("PF2E_AURA_FORGE.Notifications.DropActorRequired"));
+          return;
+        }
+        await this.#assignActor(actor);
+      } catch (error) {
+        console.error(`${MODULE_ID} | Actor drop assignment failed.`, error);
+        ui.notifications.error(game.i18n.localize("PF2E_AURA_FORGE.Notifications.AssignmentFailed"));
+      }
+    });
+  }
+
+  async #actorFromDropEvent(event) {
+    let data = null;
+    try {
+      data = globalThis.TextEditor?.getDragEventData?.(event) ?? null;
+    } catch {
+      data = null;
+    }
+    if (!data) {
+      const raw = event.dataTransfer?.getData?.("text/plain") ?? "";
+      try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
+    }
+    if (!data) return null;
+
+    let document = null;
+    if (data.uuid && typeof globalThis.fromUuid === "function") {
+      document = await globalThis.fromUuid(data.uuid);
+    }
+    document ??= data.id ? game.actors?.get?.(data.id) : null;
+    if (!document || (document.documentName && document.documentName !== "Actor")) return null;
+
+    // Aura instances intentionally live on world Actors so they follow the
+    // character between scenes rather than being tied to a synthetic token.
+    return game.actors?.get?.(document.id) ?? null;
+  }
+
+  async #assignActor(actor) {
+    this.#syncDraftFromDom();
+    this.#markDirty();
+    if (!this.selectedAuraId || this.isDirty) {
+      ui.notifications.warn(game.i18n.localize("PF2E_AURA_FORGE.Notifications.SaveBeforeAssign"));
+      return false;
+    }
+    if (!actor) {
+      ui.notifications.warn(game.i18n.localize("PF2E_AURA_FORGE.Notifications.ActorRequired"));
+      return false;
+    }
+
+    const existing = this.actorAuras.list(actor).some((x) => x.definitionId === this.selectedAuraId);
+    if (existing) {
+      // Calling assign again is intentional: it repairs legacy flag-only
+      // assignments by ensuring the PF2e passive ability proxy exists.
+      await this.actorAuras.assign(actor, this.selectedAuraId);
+      ui.notifications.warn(game.i18n.localize("PF2E_AURA_FORGE.Notifications.AlreadyAssigned"));
+      await this.#renderPreservingScroll();
+      return false;
+    }
+
+    await this.actorAuras.assign(actor, this.selectedAuraId);
+    ui.notifications.info(game.i18n.format("PF2E_AURA_FORGE.Notifications.Assigned", { actor: actor.name }));
+    await this.#renderPreservingScroll();
+    return true;
   }
 
   async close(options = {}) {
@@ -494,6 +609,7 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     const saved = await this.repository.upsert(this.draft);
+    await this.actorAuras.syncDefinition(saved.id, game.actors?.contents ?? []);
     this.auras = await this.repository.list();
     this.selectedAuraId = saved.id;
     this.draft = cloneAuraDefinition(saved);
@@ -530,6 +646,7 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!this.selectedAuraId) return;
     const confirmed = await confirmDialog("PF2E_AURA_FORGE.Dialogs.DeleteTitle", "PF2E_AURA_FORGE.Dialogs.DeletePrompt");
     if (!confirmed) return;
+    await this.actorAuras.removeDefinitionReferences(this.selectedAuraId, game.actors?.contents ?? []);
     await this.repository.remove(this.selectedAuraId);
     this.auras = await this.repository.list();
     this.effectEditor?.unmount?.();
@@ -613,6 +730,56 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this.effectEditor?.unmount?.();
     this.effectEditor = null;
     this.activeEffectRef = null;
+    await this.#renderPreservingScroll();
+  }
+
+  static async assignAura(_event, target) {
+    const select = this.element?.querySelector?.('[name="assignActorId"]');
+    const actorId = target?.dataset?.actorId || select?.value;
+    const actor = game.actors?.get?.(actorId);
+    try {
+      return await this.#assignActor(actor);
+    } catch (error) {
+      console.error(`${MODULE_ID} | Actor assignment failed.`, error);
+      ui.notifications.error(game.i18n.localize("PF2E_AURA_FORGE.Notifications.AssignmentFailed"));
+      return false;
+    }
+  }
+
+  static async assignSelectedToken() {
+    const controlled = globalThis.canvas?.tokens?.controlled ?? [];
+    if (controlled.length !== 1 || !controlled[0]?.actor) {
+      ui.notifications.warn(game.i18n.localize("PF2E_AURA_FORGE.Notifications.SelectOneToken"));
+      return;
+    }
+    const actor = game.actors?.get?.(controlled[0].actor.id);
+    if (!actor) {
+      ui.notifications.warn(game.i18n.localize("PF2E_AURA_FORGE.Notifications.WorldActorRequired"));
+      return;
+    }
+    return this.constructor.assignAura.call(this, null, { dataset: { actorId: actor.id } });
+  }
+
+  static async toggleActorAura(_event, target) {
+    const actor = game.actors?.get?.(target.dataset.actorId);
+    if (!actor) return;
+    await this.actorAuras.setEnabled(actor, target.dataset.instanceId, target.dataset.enabled !== "true");
+    await this.#renderPreservingScroll();
+  }
+
+  static async removeActorAura(_event, target) {
+    const actor = game.actors?.get?.(target.dataset.actorId);
+    if (!actor) return;
+    await this.actorAuras.remove(actor, target.dataset.instanceId);
+    await this.#renderPreservingScroll();
+  }
+
+  static async updateRadiusOverride(_event, target) {
+    const actor = game.actors?.get?.(target.dataset.actorId);
+    if (!actor) return;
+    const row = target.closest?.("[data-instance-id]");
+    const input = row?.querySelector?.('[name="radiusOverride"]');
+    await this.actorAuras.setRadiusOverride(actor, target.dataset.instanceId, input?.value ?? "");
     await this.#renderPreservingScroll();
   }
 

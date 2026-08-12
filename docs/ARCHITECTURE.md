@@ -1,36 +1,48 @@
 # Aura Forge Architecture
 
-## Core separation
+## Layers
 
 ```text
-Aura Forge container
-├── Aura definition + library workflow
-├── Presence effects
-├── Event triggers / saves / temporary immunity
-└── Embedded Effect Editor (from PF2E Critical Forge)
+Aura Library
+└── AuraDefinition (central reusable template)
+
+Actor
+├── flags.pf2e-aura-forge.auraInstances[]
+│   └── AuraInstance (reference + enabled state + overrides)
+└── Item[type=action, actionType=passive]
+    └── managed Aura ability proxy for sheet visibility
 
 Aura Engine Core
-└── Pure presence reconciliation planning
+└── later resolves Actor instances into active runtime auras
 ```
 
-`presenceEffects` are stateful relationships, not synthetic `enter` + `leave` trigger pairs. A runtime engine can therefore reconstruct them after reloads, radius changes, activation changes, or token teleports by comparing desired bindings with active bindings.
+Aura Definitions own targeting, presence effects, triggers, saves, temporary immunity policy, and Effect Forge payloads. Aura Instances do not copy those definitions. They reference `definitionId` and hold only Actor-specific state. A managed passive PF2e ability mirrors the aura name/description on the Actor sheet; it contains no runtime authority and is recreated from the instance/definition if missing.
 
-`triggers` describe discrete events. A trigger owns save and temporary-immunity policy. Its four outcome payloads are Effect Definitions owned and edited by Effect Forge.
-
-## Embedded Effect Editor contract
-
-Aura Forge uses only the public Critical Forge API:
+## Aura Instance schema v1
 
 ```js
-api.ui.effectEditor.createSession(definition)
-api.ui.effectEditor.create({ session, onChange })
-await editor.mount(container)
-editor.value
-editor.unmount()
+{
+  schemaVersion: 1,
+  id,
+  definitionId,
+  definitionName,
+  enabled,
+  overrides: {
+    radius: null | number
+  }
+}
 ```
 
-The Aura Forge container owns Save/Duplicate/Delete/Close. The embedded editor never persists or applies an aura by itself.
+`definitionName` is a display snapshot only. `definitionId` is authoritative.
 
-## Runtime boundary
+## Resolution
 
-Version 0.1.0 does **not** hook token movement or combat turns. The pure `planPresenceReconciliation` contract is included so runtime work can be added without changing the schema or UI semantics.
+Resolving an instance clones its current Aura Definition, applies supported instance overrides, and combines definition/instance enabled state. The library object is never mutated.
+
+## Referential integrity
+
+Deleting an Aura Definition also removes references to that definition from world Actors and removes the matching managed ability proxies. Duplication creates a new definition but never copies Actor assignments. On world ready, reconciliation upgrades legacy flag-only assignments and removes orphaned managed proxies.
+
+## Embedded Effect Editor
+
+Aura Forge continues to use only the public PF2E Critical Forge editor API. Actor assignment is Aura Forge container logic and does not alter the Effect Forge API contract.
