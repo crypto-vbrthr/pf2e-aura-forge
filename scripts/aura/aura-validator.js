@@ -13,6 +13,14 @@ function issue(severity, code, path, message, data = {}) {
   return { severity, code, path, message, data };
 }
 
+const INSTANT_EFFECT_COMPONENT_TYPES = new Set(["damage", "death"]);
+
+function instantComponentTypes(effect) {
+  return [...new Set((Array.isArray(effect?.components) ? effect.components : [])
+    .map((component) => String(component?.type ?? "").trim())
+    .filter((type) => INSTANT_EFFECT_COMPONENT_TYPES.has(type)))];
+}
+
 function validateEffect(effect, path, effectApi, issues) {
   if (!effect || typeof effect !== "object" || Array.isArray(effect)) {
     issues.push(issue("error", "EFFECT_REQUIRED", path, "Effect definition is required."));
@@ -66,6 +74,16 @@ export function validateAuraDefinition(definition, { effectApi = null } = {}) {
     else if (presenceIds.has(id)) issues.push(issue("error", "PRESENCE_ID_DUPLICATE", `${path}.id`, "Presence effect id must be unique."));
     presenceIds.add(id);
     validateEffect(entry?.effect, `${path}.effect`, effectApi, issues);
+    const instantTypes = instantComponentTypes(entry?.effect);
+    if (instantTypes.length > 0) {
+      issues.push(issue(
+        "error",
+        "PRESENCE_INSTANT_COMPONENT_UNSUPPORTED",
+        `${path}.effect.components`,
+        "Presence effects cannot contain instant damage or death components. Use an event outcome instead.",
+        { componentTypes: instantTypes }
+      ));
+    }
   }
 
   const triggers = Array.isArray(definition.triggers) ? definition.triggers : [];

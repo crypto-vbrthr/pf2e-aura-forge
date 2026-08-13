@@ -4,7 +4,8 @@ import {
   assertEffectForgeApi,
   createDefaultEmbeddedEffect,
   describeEffectForgeCompatibility,
-  EffectForgeIntegrationError
+  EffectForgeIntegrationError,
+  isEffectApiVersionAtLeast
 } from "../scripts/integration/effect-forge-bridge.js";
 
 function fakeBuilder() {
@@ -20,9 +21,13 @@ function fakeBuilder() {
 
 function compatibleApi() {
   return {
-    version: "0.9.4",
+    version: "0.9.6",
     schemaVersion: 2,
-    effects: { validate() { return { valid: true, errors: [], warnings: [] }; }, async apply() { return []; } },
+    effects: {
+      validate() { return { valid: true, errors: [], warnings: [] }; },
+      async apply() { return []; },
+      async execute() { return []; }
+    },
     builders: { effect: () => fakeBuilder() },
     ui: { effectEditor: { createSession() {}, create() {} } }
   };
@@ -58,6 +63,31 @@ test("bridge rejects a Critical Forge API without effect application support", (
   assert.throws(() => assertEffectForgeApi(api), (error) => {
     assert.ok(error instanceof EffectForgeIntegrationError);
     assert.equal(error.code, "EFFECT_APPLICATION_API_MISSING");
+    return true;
+  });
+});
+
+
+test("bridge requires the instant damage/death Effect API generation", () => {
+  assert.equal(isEffectApiVersionAtLeast("0.9.6"), true);
+  assert.equal(isEffectApiVersionAtLeast("0.10.0"), true);
+  assert.equal(isEffectApiVersionAtLeast("0.9.5"), false);
+
+  const api = compatibleApi();
+  api.version = "0.9.5";
+  assert.throws(() => assertEffectForgeApi(api), (error) => {
+    assert.ok(error instanceof EffectForgeIntegrationError);
+    assert.equal(error.code, "EFFECT_API_VERSION_UNSUPPORTED");
+    return true;
+  });
+});
+
+test("bridge requires the public instant execution capability", () => {
+  const api = compatibleApi();
+  delete api.effects.execute;
+  assert.throws(() => assertEffectForgeApi(api), (error) => {
+    assert.ok(error instanceof EffectForgeIntegrationError);
+    assert.equal(error.code, "EFFECT_EXECUTION_API_MISSING");
     return true;
   });
 });

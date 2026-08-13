@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.0-rc.2
+
+### Instant Damage & Death integration
+- Updated the Critical Forge dependency to 1.0.1-rc.3 and required public Effect API 0.9.6, which contains both one-shot Damage and immediate Death components.
+- Event outcomes now explicitly allow Critical Forge instant execution and pass the exact target Token, preserving token-specific PF2e damage application while keeping each claimed aura event one-shot.
+- Mixed event outcomes remain supported: persistent components create normal PF2e Effect Items and instant Damage/Death execute once in the same outcome.
+- Presence Effects reject Damage and Death during Aura validation because Presence is reconstructed state rather than a one-shot event. Runtime additionally forces `executeInstant: false` for Presence as a safety guard against malformed/imported data.
+- Updated DE/EN editor guidance so Damage/Death are authored under Event Effects rather than Presence Effects.
+- Added regression coverage for exact-token instant event application, one-shot event deduplication, Presence suppression of instant execution, instant-component validation, Critical Forge API compatibility, and manifest dependency metadata.
+
 ## 1.0.0-rc.1
 
 ### Release Candidate & Final Release Review

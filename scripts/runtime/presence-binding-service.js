@@ -99,6 +99,11 @@ export class PresenceBindingService {
     const binding = createPresenceBinding(desired);
     const definition = preparePresenceEffect(desired.effect, binding);
     return this.effectApi.effects.apply(definition, actor, {
+      // Presence is reconstructed state, not a one-shot event. Instant Effect
+      // components such as damage or death must never replay when Presence is
+      // reconciled. Aura validation rejects them here as authoring errors; this
+      // flag is the runtime safety net for imported/legacy/malformed data.
+      executeInstant: false,
       context: {
         source: "aura-presence",
         auraId: desired.auraId,

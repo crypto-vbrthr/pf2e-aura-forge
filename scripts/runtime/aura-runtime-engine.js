@@ -270,7 +270,13 @@ export class AuraRuntimeEngine {
     const effect = trigger.outcomes?.[degree] ?? null;
     if (!targetActor || !effect) return 0;
     await repairMalformedPhysicalDescriptions(targetActor);
-    await this.effectApi.effects.apply(prepareTriggerEffect(effect, event), targetActor, {
+    await this.effectApi.effects.apply(prepareTriggerEffect(effect, event), targetToken, {
+      // Event outcomes are the one-shot boundary owned by Aura Forge. Critical
+      // Forge applies persistent components and executes instant damage/death
+      // exactly once for this already-claimed aura occurrence. Passing the
+      // exact Token preserves token-specific PF2e damage application when one
+      // Actor has multiple active tokens.
+      executeInstant: true,
       context: {
         source: "aura-trigger",
         auraId: emitter.aura.id,

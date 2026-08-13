@@ -11,6 +11,23 @@ export class EffectForgeIntegrationError extends Error {
   }
 }
 
+function parseApiVersion(value) {
+  const match = String(value ?? "").trim().match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+  return match.slice(1).map(Number);
+}
+
+export function isEffectApiVersionAtLeast(value, minimum = REQUIRED_EFFECT_API_VERSION) {
+  const current = parseApiVersion(value);
+  const required = parseApiVersion(minimum);
+  if (!current || !required) return false;
+  for (let index = 0; index < 3; index += 1) {
+    if (current[index] > required[index]) return true;
+    if (current[index] < required[index]) return false;
+  }
+  return true;
+}
+
 export function getEffectForgeApi({ gameRef = globalThis.game } = {}) {
   return gameRef?.modules?.get?.(EFFECT_FORGE_MODULE_ID)?.api ?? null;
 }
@@ -18,6 +35,12 @@ export function getEffectForgeApi({ gameRef = globalThis.game } = {}) {
 export function assertEffectForgeApi(api) {
   if (!api) {
     throw new EffectForgeIntegrationError("PF2E Critical Forge API is unavailable.", "EFFECT_FORGE_API_MISSING");
+  }
+  if (!isEffectApiVersionAtLeast(api.version)) {
+    throw new EffectForgeIntegrationError(
+      `PF2E Critical Forge Effect API ${REQUIRED_EFFECT_API_VERSION} or newer is required.`,
+      "EFFECT_API_VERSION_UNSUPPORTED"
+    );
   }
   const editor = api.ui?.effectEditor;
   if (typeof editor?.createSession !== "function" || typeof editor?.create !== "function") {
@@ -28,6 +51,9 @@ export function assertEffectForgeApi(api) {
   }
   if (typeof api.effects?.apply !== "function") {
     throw new EffectForgeIntegrationError("Effect application API is unavailable.", "EFFECT_APPLICATION_API_MISSING");
+  }
+  if (typeof api.effects?.execute !== "function") {
+    throw new EffectForgeIntegrationError("Instant Effect execution API is unavailable.", "EFFECT_EXECUTION_API_MISSING");
   }
   if (typeof api.builders?.effect !== "function") {
     throw new EffectForgeIntegrationError("Effect Builder API is unavailable.", "EFFECT_BUILDER_API_MISSING");

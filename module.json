@@ -2,7 +2,7 @@
   "id": "pf2e-aura-forge",
   "title": "PF2E Aura Forge",
   "description": "Builds and manages reusable PF2e aura definitions with presence effects, event triggers, saving throws, immunity rules, and the embedded Effect Forge editor.",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "authors": [
     {
       "name": "crypto-vbrthr"
@@ -27,7 +27,7 @@
         "id": "pf2e-critical-forge",
         "type": "module",
         "compatibility": {
-          "minimum": "1.0.0-rc.1"
+          "minimum": "1.0.1-rc.3"
         }
       }
     ]
@@ -55,5 +55,5 @@
   "socket": true,
   "url": "https://github.com/crypto-vbrthr/pf2e-aura-forge",
   "manifest": "https://raw.githubusercontent.com/crypto-vbrthr/pf2e-aura-forge/main/module.json",
-  "download": "https://github.com/crypto-vbrthr/pf2e-aura-forge/releases/download/1.0.0-rc.1/pf2e-aura-forge.zip"
+  "download": "https://github.com/crypto-vbrthr/pf2e-aura-forge/releases/download/1.0.0-rc.2/pf2e-aura-forge.zip"
 }

@@ -16,6 +16,7 @@ Aura Runtime Engine
 ├── resolve active Actor instances on scene source tokens
 ├── spatial + target eligibility
 ├── discrete enter/leave/turnStart/turnEnd event processing
+├── one-shot Effect Engine damage/death execution at event boundaries
 ├── temporary-immunity lifecycle
 ├── desired Presence Effect reconciliation
 └── Effect Forge public application API
@@ -82,11 +83,13 @@ Effect Forge creates the actual PF2e Effect Item(s). Before that public API call
 
 If the embedded Effect Definition changes, its fingerprint changes. The stale bound effect bundle is removed and recreated from the new definition. Presence global duration is forced to unlimited; aura membership controls lifetime.
 
+Instant Effect Engine components (`damage`, `death`) are invalid inside Presence Effects. Presence is reconstructed repeatedly from desired scene state, so replaying one-shot mechanics there would be unsafe. Validation rejects that authoring shape and the Presence application path additionally sets `executeInstant: false` as a runtime guard.
+
 ## Enter / Leave transitions
 
 The engine keeps in-memory occupancy per scene/source-token/instance. Initial scene reconciliation seeds occupancy and therefore does not synthesize `enter` effects for creatures already inside after a reload. Subsequent movement reconciliations compare previous and current occupancy and execute `enter`/`leave` trigger effects.
 
-A trigger without a saving throw uses its `success` outcome as the direct event effect. Save-enabled event triggers resolve through the native PF2e saving-throw statistic and dispatch the matching degree-of-success outcome. A closed interactive dialog, missing remote response, or request timeout is not treated as consent to skip a mandatory save: the target Actor's runtime writer performs one native no-dialog fallback roll and uses that degree. Transition and turn side effects are owned by the target Actor's single mutation authority: PF2e `primaryUpdater` when available, with Aura Forge's deterministic coordinator as a fallback only when PF2e cannot provide one. In `request` mode that owner sends a module-socket request to an active non-GM user assigned to or owning the target Actor when possible; the player returns the resolved degree/status and the owning client applies the matching Effect Forge outcome exactly once. `automatic` and GM-request modes prefer the selected active GM. Vanishing/disabled emitters clean Presence Effects but do not synthesize a `leave` event. Turn-bound triggers use Foundry v14 combat turn history: the prior combatant receives `turnEnd` processing and the new combatant receives `turnStart` processing, with event claims keyed by stable token/combatant identity so initiative reordering does not replay an already-processed turn. Temporary immunity is persisted as a managed PF2e Effect Item. Its scope key can bind to one aura instance, one source, or one ability key; matching immunity blocks future event occurrences from that aura while it remains active. Immunity granted by one trigger does not retroactively cancel sibling triggers in the same already-started event.
+A trigger without a saving throw uses its `success` outcome as the direct event effect. Trigger outcomes are the Aura Forge one-shot boundary: the exact target Token is passed to Critical Forge `effects.apply()` with `executeInstant: true`. Persistent components create their normal PF2e Effect Items, while instant `damage` and `death` components execute once for the already-claimed aura occurrence. Passing the Token rather than only its Actor preserves token-specific damage application when the same Actor has multiple active tokens. Save-enabled event triggers resolve through the native PF2e saving-throw statistic and dispatch the matching degree-of-success outcome. A closed interactive dialog, missing remote response, or request timeout is not treated as consent to skip a mandatory save: the target Actor's runtime writer performs one native no-dialog fallback roll and uses that degree. Transition and turn side effects are owned by the target Actor's single mutation authority: PF2e `primaryUpdater` when available, with Aura Forge's deterministic coordinator as a fallback only when PF2e cannot provide one. In `request` mode that owner sends a module-socket request to an active non-GM user assigned to or owning the target Actor when possible; the player returns the resolved degree/status and the owning client applies the matching Effect Forge outcome exactly once. `automatic` and GM-request modes prefer the selected active GM. Vanishing/disabled emitters clean Presence Effects but do not synthesize a `leave` event. Turn-bound triggers use Foundry v14 combat turn history: the prior combatant receives `turnEnd` processing and the new combatant receives `turnStart` processing, with event claims keyed by stable token/combatant identity so initiative reordering does not replay an already-processed turn. Temporary immunity is persisted as a managed PF2e Effect Item. Its scope key can bind to one aura instance, one source, or one ability key; matching immunity blocks future event occurrences from that aura while it remains active. Immunity granted by one trigger does not retroactively cancel sibling triggers in the same already-started event.
 
 ### Event / Presence ordering contract
 
@@ -120,7 +123,7 @@ Coordinate-bearing `updateToken` hooks are treated as transition-capable on ever
 
 ## Embedded Effect Editor and Effect Engine
 
-Aura Forge continues to use only the public PF2E Critical Forge API. The editor remains embedded UI; persistence and Aura workflow are owned by Aura Forge. Runtime effect application uses the unchanged public `effects.apply()` API.
+Aura Forge continues to use only the public PF2E Critical Forge API. The editor remains embedded UI; persistence and Aura workflow are owned by Aura Forge. Aura Forge 1.0.0-rc.2 requires Critical Forge 1.0.1-rc.3 / Effect API 0.9.6, the public contract that exposes both instant Damage and Death. Event outcomes use `effects.apply(..., { executeInstant: true })`; Presence uses the same API with `executeInstant: false`.
 
 ## Spatial boundary
 

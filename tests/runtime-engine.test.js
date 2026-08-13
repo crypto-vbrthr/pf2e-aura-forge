@@ -155,8 +155,9 @@ function setup({
   let itemCounter = 0;
   const effectApi = {
     effects: {
-      async apply(definition, actor, options) {
-        calls.push({ definition: structuredClone(definition), actor, options });
+      async apply(definition, target, options) {
+        const actor = target?.actor ?? target;
+        calls.push({ definition: structuredClone(definition), target, actor, options });
         const item = new MockItem(`effect.${++itemCounter}`, {
           name: definition.name,
           flags: {
@@ -168,7 +169,8 @@ function setup({
         }, actor);
         actor.items.push(item);
         return [item];
-      }
+      },
+      async execute() { return []; }
     }
   };
   const gameRef = {
@@ -225,6 +227,35 @@ test("moving into an aura applies presence and fires enter trigger", async () =>
   assert.equal(report.transitions.entered, 1);
   assert.equal(presenceItems(targetActor).length, 1);
   assert.equal(calls.filter((call) => call.definition.id === "enter.effect").length, 1);
+});
+
+test("event outcomes pass instant damage and death through Critical Forge exactly once on the exact target token", async () => {
+  const { runtime, aura, scene, targetToken, calls } = setup();
+  aura.triggers[0].outcomes.success = {
+    schemaVersion: 2,
+    id: "enter.instant",
+    name: "Venomous Doom",
+    duration: { value: -1, unit: "unlimited", expiry: null },
+    components: [
+      { type: "damage", formula: "2d6+3", damageType: "poison" },
+      { type: "death", category: "death-effect" }
+    ]
+  };
+
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  targetToken.x = 200;
+  await runtime.reconcileScene(scene, { fireEvents: true });
+  await runtime.reconcileScene(scene, { fireEvents: true });
+
+  const instantCalls = calls.filter((call) => call.definition.id === "enter.instant");
+  assert.equal(instantCalls.length, 1);
+  assert.equal(instantCalls[0].target, targetToken);
+  assert.equal(instantCalls[0].options.executeInstant, true);
+  assert.deepEqual(instantCalls[0].definition.components, [
+    { type: "damage", formula: "2d6+3", damageType: "poison" },
+    { type: "death", category: "death-effect" }
+  ]);
 });
 
 test("save-enabled enter trigger requests the PF2e save and applies the matching outcome", async () => {

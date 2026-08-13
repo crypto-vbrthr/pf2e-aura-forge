@@ -26,6 +26,9 @@ const criticalForge = moduleJson.relationships?.requires?.find((entry) => entry.
 if (!criticalForge || criticalForge.type !== "module" || !criticalForge.compatibility?.minimum) {
   throw new Error("PF2E Critical Forge dependency metadata is missing.");
 }
+if (criticalForge.compatibility.minimum !== "1.0.1-rc.3") {
+  throw new Error("Aura Forge instant outcome support requires PF2E Critical Forge 1.0.1-rc.3 or newer.");
+}
 if (moduleJson.socket !== true) throw new Error("Aura Forge module socket must be enabled.");
 
 const requiredFiles = [

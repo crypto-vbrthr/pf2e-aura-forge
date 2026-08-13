@@ -14,3 +14,10 @@ test("ready hook contains a mixed-install fail-fast guard", async () => {
   assert.match(source, /Mixed installation detected/);
   assert.match(source, /manifestVersion !== MODULE_VERSION/);
 });
+
+
+test("manifest requires the Critical Forge build that exposes instant damage and death", async () => {
+  const manifest = JSON.parse(await readFile(new URL("../module.json", import.meta.url), "utf8"));
+  const dependency = manifest.relationships?.requires?.find((entry) => entry.id === "pf2e-critical-forge");
+  assert.equal(dependency?.compatibility?.minimum, "1.0.1-rc.3");
+});

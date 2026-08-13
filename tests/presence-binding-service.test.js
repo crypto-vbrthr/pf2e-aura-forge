@@ -83,6 +83,7 @@ test("PresenceBindingService applies one already-tagged definition and performs 
   assert.deepEqual(result, [item]);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].target, actor);
+  assert.equal(calls[0].options.executeInstant, false);
   assert.equal(
     calls[0].definition.metadata[PRESENCE_BINDING_METADATA].key,
     desired.key

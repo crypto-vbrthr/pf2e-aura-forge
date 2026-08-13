@@ -68,3 +68,46 @@ test("trigger without outcomes is a warning, not an error", () => {
   assert.equal(report.valid, true);
   assert.ok(report.warnings.some((entry) => entry.code === "TRIGGER_WITHOUT_OUTCOME"));
 });
+
+
+test("instant damage and death are rejected as Presence Effects", () => {
+  for (const component of [
+    { type: "damage", formula: "1d6", damageType: "fire" },
+    { type: "death", category: "direct" }
+  ]) {
+    const aura = createAuraDefinition({
+      name: "Unsafe Presence",
+      presenceEffects: [{
+        id: `presence.${component.type}`,
+        effect: { ...validEffect, id: `effect.${component.type}`, components: [component] }
+      }]
+    });
+    const report = validateAuraDefinition(aura, { effectApi });
+    assert.equal(report.valid, false);
+    assert.ok(report.errors.some((entry) => entry.code === "PRESENCE_INSTANT_COMPONENT_UNSUPPORTED"));
+  }
+});
+
+test("instant damage and death are valid Event Effect outcomes", () => {
+  const aura = createAuraDefinition({
+    name: "Event Doom",
+    triggers: [{
+      id: "trigger.instant",
+      event: "turnEnd",
+      save: { enabled: false },
+      outcomes: {
+        success: {
+          ...validEffect,
+          id: "effect.instant",
+          components: [
+            { type: "damage", formula: "2d6", damageType: "void" },
+            { type: "death", category: "death-effect" }
+          ]
+        }
+      }
+    }]
+  });
+  const report = validateAuraDefinition(aura, { effectApi });
+  assert.equal(report.valid, true);
+  assert.equal(report.errors.some((entry) => entry.code === "PRESENCE_INSTANT_COMPONENT_UNSUPPORTED"), false);
+});
