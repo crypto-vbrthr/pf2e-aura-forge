@@ -105,10 +105,15 @@ export class AuraSaveResolutionService {
     return canResolveSaveForMode(actor, saveDefinition?.mode ?? "request", this.gameRef);
   }
 
-  async roll({ targetActor, targetToken, sourceActor, trigger, aura }) {
+  async #performRoll({ targetActor, targetToken, sourceActor, trigger, aura }, {
+    forceResolver = false,
+    skipDialog = null
+  } = {}) {
     const save = trigger?.save;
     if (!save?.enabled) return { status: "not-required", roll: null, degree: null };
-    if (!this.canResolve(targetActor, save)) return { status: "not-resolver", roll: null, degree: null };
+    if (!forceResolver && !this.canResolve(targetActor, save)) {
+      return { status: "not-resolver", roll: null, degree: null };
+    }
 
     const statistic = resolveSaveStatistic(targetActor, save.type);
     if (!statistic || typeof statistic.roll !== "function") {
@@ -131,10 +136,10 @@ export class AuraSaveResolutionService {
         `aura-forge:event:${trigger.event ?? "unknown"}`,
         `aura-forge:aura:${aura?.id ?? "unknown"}`
       ],
-      skipDialog: mode === "automatic"
+      skipDialog: skipDialog == null ? mode === "automatic" : Boolean(skipDialog)
     });
 
-    if (!roll) return { status: "cancelled", roll: null, degree: null };
+    if (!roll) return { status: "cancelled", roll: null, degree: null, saveType: save.type };
     const degree = degreeKeyFromRoll(roll);
     return {
       status: degree ? "resolved" : "unresolved-degree",
@@ -143,5 +148,19 @@ export class AuraSaveResolutionService {
       saveType: save.type,
       dc: Number.isFinite(dc) ? dc : 0
     };
+  }
+
+  async roll(request) {
+    return this.#performRoll(request);
+  }
+
+  /**
+   * Mandatory Aura saves cannot be opted out of by closing a roll dialog or
+   * by a remote request timing out. The target Actor's runtime writer may use
+   * this deterministic no-dialog fallback after the normal resolver path did
+   * not produce a degree of success.
+   */
+  async rollForced(request, { skipDialog = true } = {}) {
+    return this.#performRoll(request, { forceResolver: true, skipDialog });
   }
 }

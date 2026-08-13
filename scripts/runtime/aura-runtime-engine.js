@@ -307,6 +307,41 @@ export class AuraRuntimeEngine {
     }
   }
 
+  async #resolveMandatorySave(request) {
+    let initial;
+    try {
+      initial = this.socketService
+        ? await this.socketService.resolveSave(request)
+        : await this.saveResolution.roll(request);
+    } catch (error) {
+      initial = { status: "error", degree: null, error };
+    }
+
+    if (initial?.status === "resolved") {
+      return { result: initial, fallbackUsed: false, initialStatus: "resolved", initialError: null };
+    }
+    if (initial?.status === "not-required") {
+      return { result: initial, fallbackUsed: false, initialStatus: "not-required", initialError: null };
+    }
+
+    // A save attached to an Aura trigger is mandatory game state. Closing the
+    // dialog, losing the remote resolver, or timing out must not turn the save
+    // into an opt-out. The Actor's single runtime writer resolves one native
+    // PF2e no-dialog fallback and continues from that degree of success.
+    let fallback;
+    try {
+      fallback = await this.saveResolution.rollForced(request, { skipDialog: true });
+    } catch (error) {
+      fallback = { status: "error", degree: null, error };
+    }
+    return {
+      result: fallback,
+      fallbackUsed: true,
+      initialStatus: initial?.status ?? "error",
+      initialError: initial?.error ?? null
+    };
+  }
+
   async #runTrigger(emitter, targetToken, event) {
     const targetActor = targetToken?.actor;
     if (!targetActor) {
@@ -315,6 +350,8 @@ export class AuraRuntimeEngine {
         deferred: 0,
         savesResolved: 0,
         savesCancelled: 0,
+        savesFallback: 0,
+        saveFallbacks: [],
         saveErrors: [],
         immunityApplied: 0,
         immunitySkipped: 0,
@@ -332,6 +369,8 @@ export class AuraRuntimeEngine {
         deferred: 0,
         savesResolved: 0,
         savesCancelled: 0,
+        savesFallback: 0,
+        saveFallbacks: [],
         saveErrors: [],
         immunityApplied: 0,
         immunitySkipped: 0,
@@ -343,8 +382,10 @@ export class AuraRuntimeEngine {
     let deferred = 0;
     let savesResolved = 0;
     let savesCancelled = 0;
+    let savesFallback = 0;
     let immunityApplied = 0;
     let immunitySkipped = 0;
+    const saveFallbacks = [];
     const saveErrors = [];
     const immunityErrors = [];
 
@@ -364,6 +405,8 @@ export class AuraRuntimeEngine {
         deferred,
         savesResolved,
         savesCancelled,
+        savesFallback,
+        saveFallbacks,
         saveErrors,
         immunityApplied,
         immunitySkipped,
@@ -374,25 +417,27 @@ export class AuraRuntimeEngine {
     for (const trigger of matchingTriggers) {
 
       if (trigger.save?.enabled) {
-        let result = null;
-        try {
-          const request = {
-            targetActor,
-            targetToken,
-            sourceActor: emitter.sourceActor,
-            sourceToken: emitter.sourceToken,
-            trigger,
-            aura: emitter.aura
-          };
-          result = this.socketService
-            ? await this.socketService.resolveSave(request)
-            : await this.saveResolution.roll(request);
-        } catch (error) {
-          saveErrors.push({ triggerId: trigger.id, status: "error", error });
-          continue;
+        const request = {
+          targetActor,
+          targetToken,
+          sourceActor: emitter.sourceActor,
+          sourceToken: emitter.sourceToken,
+          trigger,
+          aura: emitter.aura
+        };
+        const resolution = await this.#resolveMandatorySave(request);
+        const result = resolution.result;
+        if (resolution.fallbackUsed) {
+          savesFallback += 1;
+          saveFallbacks.push({
+            triggerId: trigger.id,
+            initialStatus: resolution.initialStatus,
+            resolved: result?.status === "resolved"
+          });
+          if (resolution.initialStatus === "cancelled") savesCancelled += 1;
         }
 
-        if (result.status === "resolved") {
+        if (result?.status === "resolved") {
           savesResolved += 1;
           try {
             applied += await this.#applyTriggerOutcome(emitter, trigger, targetToken, event, result.degree);
@@ -402,10 +447,11 @@ export class AuraRuntimeEngine {
           const immunity = await this.#applyTriggerImmunity(emitter, trigger, targetActor, result.degree);
           immunityApplied += immunity.applied;
           if (immunity.error) immunityErrors.push({ triggerId: trigger.id, status: "apply-error", error: immunity.error });
-        } else if (result.status === "cancelled") {
+        } else if (result?.status === "cancelled") {
           savesCancelled += 1;
-        } else if (!['not-resolver', 'not-required'].includes(result.status)) {
-          saveErrors.push({ triggerId: trigger.id, status: result.status, saveType: trigger.save.type });
+          saveErrors.push({ triggerId: trigger.id, status: "fallback-cancelled", saveType: trigger.save.type });
+        } else if (!["not-resolver", "not-required"].includes(result?.status)) {
+          saveErrors.push({ triggerId: trigger.id, status: result?.status ?? "unavailable", saveType: trigger.save.type });
         }
         continue;
       }
@@ -426,6 +472,8 @@ export class AuraRuntimeEngine {
       deferred,
       savesResolved,
       savesCancelled,
+      savesFallback,
+      saveFallbacks,
       saveErrors,
       immunityApplied,
       immunitySkipped,
@@ -440,8 +488,10 @@ export class AuraRuntimeEngine {
     let deferredSaves = 0;
     let savesResolved = 0;
     let savesCancelled = 0;
+    let savesFallback = 0;
     let immunityApplied = 0;
     let immunitySkipped = 0;
+    const saveFallbacks = [];
     const saveErrors = [];
     const immunityErrors = [];
     const activeEmitterKeys = new Set(emitters.map((emitter) => emitter.key));
@@ -468,6 +518,8 @@ export class AuraRuntimeEngine {
         deferredSaves += result.deferred;
         savesResolved += result.savesResolved ?? 0;
         savesCancelled += result.savesCancelled ?? 0;
+        savesFallback += result.savesFallback ?? 0;
+        saveFallbacks.push(...(result.saveFallbacks ?? []));
         saveErrors.push(...(result.saveErrors ?? []));
         immunityApplied += result.immunityApplied ?? 0;
         immunitySkipped += result.immunitySkipped ?? 0;
@@ -481,6 +533,8 @@ export class AuraRuntimeEngine {
         deferredSaves += result.deferred;
         savesResolved += result.savesResolved ?? 0;
         savesCancelled += result.savesCancelled ?? 0;
+        savesFallback += result.savesFallback ?? 0;
+        saveFallbacks.push(...(result.saveFallbacks ?? []));
         saveErrors.push(...(result.saveErrors ?? []));
         immunityApplied += result.immunityApplied ?? 0;
         immunitySkipped += result.immunitySkipped ?? 0;
@@ -501,6 +555,8 @@ export class AuraRuntimeEngine {
       deferredSaves,
       savesResolved,
       savesCancelled,
+      savesFallback,
+      saveFallbacks,
       saveErrors,
       immunityApplied,
       immunitySkipped,
@@ -564,6 +620,8 @@ export class AuraRuntimeEngine {
       triggerEffects: 0,
       savesResolved: 0,
       savesCancelled: 0,
+      savesFallback: 0,
+      saveFallbacks: [],
       saveErrors: [],
       immunityApplied: 0,
       immunitySkipped: 0,
@@ -581,6 +639,8 @@ export class AuraRuntimeEngine {
       report.triggerEffects += result.applied ?? 0;
       report.savesResolved += result.savesResolved ?? 0;
       report.savesCancelled += result.savesCancelled ?? 0;
+      report.savesFallback += result.savesFallback ?? 0;
+      report.saveFallbacks.push(...(result.saveFallbacks ?? []));
       report.saveErrors.push(...(result.saveErrors ?? []));
       report.immunityApplied += result.immunityApplied ?? 0;
       report.immunitySkipped += result.immunitySkipped ?? 0;

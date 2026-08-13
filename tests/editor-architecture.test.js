@@ -70,3 +70,12 @@ test("presence-blocking immunity explains immediate removal and later restoratio
   assert.match(editorSource, /presenceInteractionHint/);
   assert.match(editorSource, /immunityBlocksPresence/);
 });
+
+test("duplicate action validates the current embedded Aura draft before writing a copy", async () => {
+  const source = await readFile(new URL("../scripts/ui/aura-forge-app.js", import.meta.url), "utf8");
+  const duplicateBody = source.slice(source.indexOf("static async duplicateAura"), source.indexOf("static async deleteAura"));
+  assert.match(duplicateBody, /this\.auraEditor\.validate\(\)/);
+  assert.match(duplicateBody, /if \(!validation\.valid\)/);
+  assert.match(duplicateBody, /repository\.upsert\(copy\)/);
+  assert.ok(duplicateBody.indexOf("auraEditor.validate()") < duplicateBody.indexOf("repository.upsert(copy)"));
+});

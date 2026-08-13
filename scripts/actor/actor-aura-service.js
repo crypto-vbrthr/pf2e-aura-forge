@@ -20,6 +20,52 @@ function auraAbilityFlag(item) {
     ?? null;
 }
 
+function collectionContents(collection) {
+  if (!collection) return [];
+  if (Array.isArray(collection)) return collection;
+  if (Array.isArray(collection.contents)) return collection.contents;
+  try { return Array.from(collection); } catch { return []; }
+}
+
+function sameUser(a, b) {
+  return Boolean(a && b && String(a.id ?? a._id ?? "") !== ""
+    && String(a.id ?? a._id) === String(b.id ?? b._id));
+}
+
+/**
+ * Automatic proxy reconciliation is multi-client code. Exactly one active
+ * client is allowed to write a given Actor: PF2e's primaryUpdater when
+ * available, otherwise a deterministic active owner/GM fallback. Explicit
+ * user-initiated assignment methods remain governed by normal Foundry
+ * permissions and are not filtered through this helper.
+ */
+export function canReconcileAuraActor(actor, gameRef = globalThis.game) {
+  const user = gameRef?.user;
+  if (!user) return true; // unit/offline contexts
+  if (!actor) return false;
+  if (actor.primaryUpdater) return sameUser(actor.primaryUpdater, user);
+
+  const active = collectionContents(gameRef?.users).filter((entry) => entry?.active !== false);
+  const gm = gameRef?.users?.activeGM
+    ?? active.filter((entry) => entry?.isGM).sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")))[0]
+    ?? null;
+  if (gm) return sameUser(gm, user);
+
+  const owners = active
+    .filter((entry) => {
+      if (typeof actor.testUserPermission === "function") {
+        try { return actor.testUserPermission(entry, "OWNER"); } catch { /* fall through */ }
+      }
+      if (typeof actor.canUserModify === "function") {
+        try { return actor.canUserModify(entry, "update"); } catch { return false; }
+      }
+      return false;
+    })
+    .sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")));
+  const writer = owners[0] ?? active.sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")))[0] ?? user;
+  return sameUser(writer, user);
+}
+
 function abilityDescription(definition) {
   return String(definition?.description ?? "");
 }
@@ -82,8 +128,31 @@ export function createAuraAbilitySource(definition, instance) {
   };
 }
 
+
+function stableJson(value) {
+  return JSON.stringify(value ?? null);
+}
+
+/** Return true only when the managed proxy differs from its desired source. */
+export function auraAbilityNeedsSync(item, definition, instance) {
+  if (!item) return true;
+  const desired = createAuraAbilitySource(definition, instance);
+  const currentFlag = auraAbilityFlag(item);
+  return String(item.name ?? "") !== desired.name
+    || String(item.system?.description?.value ?? "") !== desired.system.description.value
+    || item.system?.actionType?.value !== "passive"
+    || (item.system?.actions?.value ?? null) !== null
+    || item.system?.category !== "interaction"
+    || stableJson(item.system?.traits?.value ?? []) !== stableJson(["aura"])
+    || stableJson(item.system?.rules ?? []) !== stableJson(desired.system.rules)
+    || stableJson(currentFlag) !== stableJson(desired.flags[MODULE_ID][AURA_ABILITY_FLAG]);
+}
+
 export class ActorAuraService {
-  constructor({ library }) { this.library = library; }
+  constructor({ library, gameRef = globalThis.game } = {}) {
+    this.library = library;
+    this.gameRef = gameRef;
+  }
 
   list(actor) {
     const raw = actor?.getFlag?.(MODULE_ID, ACTOR_AURA_FLAG);
@@ -121,6 +190,7 @@ export class ActorAuraService {
 
     const current = this.#findAbility(actor, instance.id);
     if (current) {
+      if (!auraAbilityNeedsSync(current, definition, instance)) return current;
       if (typeof actor?.updateEmbeddedDocuments === "function") {
         const [updated] = await actor.updateEmbeddedDocuments("Item", [this.#abilityUpdate(current, definition, instance)]);
         return updated ?? current;
@@ -187,7 +257,14 @@ export class ActorAuraService {
     const instances = this.list(actor);
     const item = instances.find((x) => x.id === instanceId);
     if (!item) return null;
-    item.overrides.radius = value === "" || value == null ? null : Number(value);
+    if (value === "" || value == null) item.overrides.radius = null;
+    else {
+      const radius = Number(value);
+      if (!Number.isFinite(radius) || radius <= 0) {
+        throw new RangeError("Aura radius override must be null or a finite number greater than 0.");
+      }
+      item.overrides.radius = radius;
+    }
     await this.#write(actor, instances);
     await this.#ensureAbility(actor, item);
     return item;
@@ -213,15 +290,22 @@ export class ActorAuraService {
   /** Ensure legacy flag-only assignments gain their sheet-visible PF2e ability. */
   async reconcileActor(actor) {
     const instances = this.list(actor);
+    if (!canReconcileAuraActor(actor, this.gameRef)) {
+      return { instances: instances.length, synced: 0, unchanged: 0, removedOrphans: 0, skippedWriter: true };
+    }
     const validIds = new Set(instances.map((x) => x.id));
     let createdOrUpdated = 0;
+    let unchanged = 0;
     let removedOrphans = 0;
 
     for (const instance of instances) {
       const definition = await this.library.get(instance.definitionId);
       if (!definition) continue;
+      const current = this.#findAbility(actor, instance.id);
+      const needsSync = !current || auraAbilityNeedsSync(current, definition, instance);
       await this.#ensureAbility(actor, instance, definition);
-      createdOrUpdated += 1;
+      if (needsSync) createdOrUpdated += 1;
+      else unchanged += 1;
     }
 
     const orphanIds = itemList(actor)
@@ -236,7 +320,7 @@ export class ActorAuraService {
       removedOrphans = orphanIds.length;
     }
 
-    return { instances: instances.length, synced: createdOrUpdated, removedOrphans };
+    return { instances: instances.length, synced: createdOrUpdated, unchanged, removedOrphans, skippedWriter: false };
   }
 
   async reconcileAll(actors = []) {
@@ -257,8 +341,11 @@ export class ActorAuraService {
     const definition = await this.library.get(definitionId);
     if (!definition) return synced;
     for (const actor of actors) {
+      if (!canReconcileAuraActor(actor, this.gameRef)) continue;
       for (const instance of this.list(actor)) {
         if (instance.definitionId !== definitionId) continue;
+        const current = this.#findAbility(actor, instance.id);
+        if (current && !auraAbilityNeedsSync(current, definition, instance)) continue;
         await this.#ensureAbility(actor, instance, definition);
         synced += 1;
       }

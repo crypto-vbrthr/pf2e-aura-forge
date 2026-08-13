@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.1
+
+### Final Contract & Runtime Hardening
+- Actor aura proxy reconciliation is now single-writer per Actor, preferring PF2e `primaryUpdater` and using a deterministic active-owner/GM fallback only when PF2e exposes no updater. Library-setting changes ask every client to reconcile, while only the selected writer mutates each Actor.
+- Managed passive aura proxies are now truly idempotent: unchanged proxies are left untouched instead of receiving redundant embedded Item updates during ready/library reconciliation.
+- Radius overrides now accept only `null`/empty or a finite number greater than zero; invalid public API values throw before Actor state is changed.
+- Aura Library `upsert` now enforces AuraDefinition validity, and the standalone Duplicate action validates the current embedded editor draft before writing a copy. Public API writes additionally run Effect Forge-aware Aura validation.
+- Mandatory saving throws can no longer be bypassed by closing the native roll dialog or by a remote request timing out. The target Actor's runtime writer performs one no-dialog native PF2e fallback roll and continues with that degree of success. Runtime reports expose save-fallback diagnostics.
+- `api.engine.planPresence()` now understands the live runtime identity model (scene + source token + aura instance + presence + target Actor), actor-level token grouping, Presence blocking, and effect-fingerprint replacement. The old token-bound contract is still accepted and is also exposed explicitly as `planPresenceLegacy`; `planPresenceRuntime` provides the current contract directly.
+- Documented current spatial boundaries explicitly: outside-to-outside movement that merely crosses an aura path does not synthesize enter/leave, and PF2e wall/sensory aura-square blocking is not reproduced yet.
+- API version advanced to 0.5.0; Aura Definition and Aura Instance schema versions remain unchanged.
+- Added regression coverage for multi-client proxy ownership, zero-write idempotent reconciliation, radius validation, invalid library writes, duplicate validation, save cancel/timeout fallback, current Presence planning, fingerprint replacement, and proxy refresh after library changes.
+
 ## 0.5.0
 
 ### Embedded Aura Editor Refactor & Public UI API

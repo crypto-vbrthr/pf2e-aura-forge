@@ -24,7 +24,19 @@ export function initializePublicApi({ openAuraForge }) {
   const module = game.modules.get(MODULE_ID);
   if (!module) throw new Error(`Module ${MODULE_ID} is unavailable.`);
   const repository = createFoundryAuraRepository();
-  const actorAuras = new ActorAuraService({ library: repository });
+  const actorAuras = new ActorAuraService({ library: repository, gameRef: game });
+  const validateForStorage = (definition) => {
+    const normalized = createAuraDefinition(definition);
+    const report = validateAuraDefinition(normalized, { effectApi: getEffectForgeApi()?.effects ?? null });
+    if (!report.valid) {
+      const error = new Error(report.errors.map((entry) => entry.message).join("; ") || "Aura definition is invalid.");
+      error.name = "AuraDefinitionValidationError";
+      error.code = "AURA_DEFINITION_INVALID";
+      error.validation = report;
+      throw error;
+    }
+    return normalized;
+  };
   runtimeEngine = new AuraRuntimeEngine({
     library: repository,
     actorAuras,
@@ -49,7 +61,7 @@ export function initializePublicApi({ openAuraForge }) {
     library: Object.freeze({
       list: () => repository.list(),
       get: (id) => repository.get(id),
-      upsert: (definition) => repository.upsert(definition),
+      upsert: (definition) => repository.upsert(validateForStorage(definition)),
       remove: (id) => repository.remove(id),
       duplicate: (id, options = {}) => repository.duplicate(id, options)
     }),
@@ -69,6 +81,8 @@ export function initializePublicApi({ openAuraForge }) {
 
     engine: Object.freeze({
       planPresence: (options) => auraEngineCore.planPresence(options),
+      planPresenceRuntime: (options) => auraEngineCore.planPresenceRuntime(options),
+      planPresenceLegacy: (options) => auraEngineCore.planPresenceLegacy(options),
       reconcileScene: (scene = globalThis.canvas?.scene, options = {}) => runtimeEngine.reconcileScene(scene, options),
       deactivateScene: (scene = globalThis.canvas?.scene) => runtimeEngine.deactivateScene(scene),
       status: () => runtimeEngine.status()

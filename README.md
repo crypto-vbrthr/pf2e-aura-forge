@@ -1,6 +1,6 @@
 # PF2E Aura Forge
 
-Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 0.5.0 adds the **Embedded Aura Editor Refactor & Public UI API** while preserving the existing runtime, library, instance, and engine contracts.
+Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 0.5.1 completes the **Final Contract & Runtime Hardening** pass on top of the reusable Embedded Aura Editor introduced in 0.5.0.
 
 ## Included
 
@@ -21,7 +21,7 @@ Aura Forge is the aura-definition, assignment, and runtime layer for the Forge S
 - `enter` and `leave` transitions execute event effects for triggers without a saving throw.
 - Save-enabled `enter` and `leave` triggers use native PF2e saves and dispatch the matching degree-of-success outcome.
 - `request` mode explicitly routes the native PF2e roll dialog over the Aura Forge module socket to the active player assigned to or owning the target Actor, even if another client moved the token. `automatic` mode prefers one active GM; `gm` mode runs on that GM.
-- Runtime side effects are owned by exactly one client per target Actor: PF2e `primaryUpdater` when available, with Aura Forge's deterministic coordinator only as a fallback. This keeps active-GM games single-writer while also supporting no-GM/player-owned sessions.
+- Runtime side effects and automatic Actor proxy reconciliation are owned by exactly one client per target Actor: PF2e `primaryUpdater` when available, with deterministic owner/GM fallbacks only when PF2e exposes no updater. Unchanged proxy abilities are not rewritten.
 - Before mutating runtime Effect Items, Aura Forge narrowly repairs PF2e physical Items that are structurally missing `system.description`, preventing unrelated malformed legacy/custom equipment from aborting the Actor reset triggered by effect creation.
 - Scene, token, actor-instance, targeting, radius, and library changes automatically schedule runtime reconciliation.
 - `api.engine.reconcileScene()`, `api.engine.deactivateScene()`, and `api.engine.status()` are available as additive diagnostics/runtime controls.
@@ -66,7 +66,7 @@ matching Tokens inside range
 
 The runtime prefers PF2e's Token placeable `distanceTo()` measurement, matching the system's own initial aura range check. A rectangle/grid fallback exists for degraded/test contexts. Presence effects are forced to unlimited global duration because their lifetime is controlled by aura membership, then removed by their exact Aura Forge binding when no longer desired. The binding is inserted into the Effect Definition metadata before Critical Forge creates the PF2e Effect Item, avoiding a second Actor/Item update solely for runtime tagging.
 
-For a trigger **without** a saving throw, the `success` outcome slot is the direct event effect. For a trigger **with** a saving throw, the target Actor's single runtime updater owns the event and routes an owner-facing roll over the module socket when required. The resolver calls the target Actor's native PF2e save statistic and returns the degree before the owning client applies the matching Effect Forge outcome. `turnStart` and `turnEnd` use the same ownership path. Temporary immunities are visible PF2e Effect Items with their configured duration and are checked before a new aura event begins. If one trigger grants immunity, sibling triggers belonging to that same already-started event still resolve; the immunity applies to subsequent events and to the post-event Presence pass.
+For a trigger **without** a saving throw, the `success` outcome slot is the direct event effect. For a trigger **with** a saving throw, the target Actor's single runtime updater owns the event and routes an owner-facing roll over the module socket when required. The resolver calls the target Actor's native PF2e save statistic and returns the degree before the owning client applies the matching Effect Forge outcome. Closing that dialog or losing the remote resolver does not opt the target out: the runtime writer performs one automatic native PF2e fallback roll. `turnStart` and `turnEnd` use the same ownership path. Temporary immunities are visible PF2e Effect Items with their configured duration and are checked before a new aura event begins. If one trigger grants immunity, sibling triggers belonging to that same already-started event still resolve; the immunity applies to subsequent events and to the post-event Presence pass.
 
 ## Embedded Aura Editor API
 
@@ -106,11 +106,25 @@ await api.instances.setRadiusOverride(actor, instance.id, 20);
 
 await api.engine.reconcileScene(canvas.scene, { fireEvents: false });
 console.log(api.engine.status());
+
+// Pure current-contract Presence planning for external Forge consumers:
+const plan = api.engine.planPresenceRuntime({
+  sceneId: canvas.scene.id,
+  aura,
+  instanceId: instance.id,
+  sourceTokenId: token.id,
+  candidates,
+  activeBindings,
+  isInside: (candidate) => candidate.inside,
+  isPresenceBlocked: (candidate) => candidate.auraImmune
+});
 ```
+
+`api.engine.planPresence()` auto-selects the current `runtime-v1` contract when `sceneId`/`instanceId` are supplied. The pre-runtime token-bound shape remains accepted for compatibility and is available explicitly as `planPresenceLegacy()`.
 
 ## Current runtime boundary
 
-This release executes Presence Effects plus save/no-save `enter`, `leave`, `turnStart`, and `turnEnd` triggers. Temporary immunity can be granted on configured degrees of success, persists as a PF2e Effect Item, and blocks matching aura event triggers until it expires. Minute/hour/day immunity also has a world-time fallback check; round-based expiry follows PF2e effect-duration state. The runtime still does not reproduce PF2e's native aura-square wall/sensory-trait blocking; spatial membership uses PF2e token distance. Hidden-token exclusion follows the native PF2e aura membership rule. Runtime operations are serialized per scene, queued work is cancelled during canvas teardown, and combat-event claims are keyed by combatant/token identity rather than mutable initiative indexes.
+This release executes Presence Effects plus save/no-save `enter`, `leave`, `turnStart`, and `turnEnd` triggers. Temporary immunity can be granted on configured degrees of success, persists as a PF2e Effect Item, and blocks matching aura event triggers until it expires. Minute/hour/day immunity also has a world-time fallback check; round-based expiry follows PF2e effect-duration state. Spatial membership evaluates the current token positions. A movement whose start and end are both outside an aura does not synthesize `enter`/`leave` merely because its animation/path crossed the radius. The runtime also does not yet reproduce PF2e's native aura-square wall/sensory-trait blocking. Hidden-token exclusion follows the native PF2e aura membership rule. Runtime operations are serialized per scene, queued work is cancelled during canvas teardown, and combat-event claims are keyed by combatant/token identity rather than mutable initiative indexes.
 
 ### Clean-install guard
 

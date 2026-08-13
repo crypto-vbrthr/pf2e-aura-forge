@@ -45,7 +45,7 @@ Creature Forge / other consumer
 
 `AuraEditorSession` owns the editable `AuraDefinition`, dirty state, validation result, and consumer context. `EmbeddedAuraEditor` owns only Aura-definition editing UI and nested Effect Editor sessions. It deliberately has no Aura Library persistence, Actor assignment, runtime-application, or document-save buttons. The host container decides what happens to `editor.value`.
 
-The additive public contract is `api.ui.auraEditor` with `createSession`, `create`, `render`, `prepareContext`, and `template`. Existing `api.ui.openAuraForge`, `api.library`, `api.instances`, and `api.engine` contracts are unchanged.
+The public editor contract is `api.ui.auraEditor` with `createSession`, `create`, `render`, `prepareContext`, and `template`. Aura Forge 0.5.1 also hardens the engine contract: `api.engine.planPresenceRuntime()` models the live actor-bound Presence identity directly, while `planPresence()` auto-selects that contract when scene/instance identity is supplied and still accepts the legacy token-bound shape for compatibility.
 
 ## Aura Instance schema v1
 
@@ -86,7 +86,7 @@ If the embedded Effect Definition changes, its fingerprint changes. The stale bo
 
 The engine keeps in-memory occupancy per scene/source-token/instance. Initial scene reconciliation seeds occupancy and therefore does not synthesize `enter` effects for creatures already inside after a reload. Subsequent movement reconciliations compare previous and current occupancy and execute `enter`/`leave` trigger effects.
 
-A trigger without a saving throw uses its `success` outcome as the direct event effect. Save-enabled event triggers resolve through the native PF2e saving-throw statistic and dispatch the matching degree-of-success outcome. Transition and turn side effects are owned by the target Actor's single mutation authority: PF2e `primaryUpdater` when available, with Aura Forge's deterministic coordinator as a fallback only when PF2e cannot provide one. In `request` mode that owner sends a module-socket request to an active non-GM user assigned to or owning the target Actor when possible; the player returns the resolved degree/status and the owning client applies the matching Effect Forge outcome exactly once. `automatic` and GM-request modes prefer the selected active GM. Vanishing/disabled emitters clean Presence Effects but do not synthesize a `leave` event. Turn-bound triggers use Foundry v14 combat turn history: the prior combatant receives `turnEnd` processing and the new combatant receives `turnStart` processing, with event claims keyed by stable token/combatant identity so initiative reordering does not replay an already-processed turn. Temporary immunity is persisted as a managed PF2e Effect Item. Its scope key can bind to one aura instance, one source, or one ability key; matching immunity blocks future event occurrences from that aura while it remains active. Immunity granted by one trigger does not retroactively cancel sibling triggers in the same already-started event.
+A trigger without a saving throw uses its `success` outcome as the direct event effect. Save-enabled event triggers resolve through the native PF2e saving-throw statistic and dispatch the matching degree-of-success outcome. A closed interactive dialog, missing remote response, or request timeout is not treated as consent to skip a mandatory save: the target Actor's runtime writer performs one native no-dialog fallback roll and uses that degree. Transition and turn side effects are owned by the target Actor's single mutation authority: PF2e `primaryUpdater` when available, with Aura Forge's deterministic coordinator as a fallback only when PF2e cannot provide one. In `request` mode that owner sends a module-socket request to an active non-GM user assigned to or owning the target Actor when possible; the player returns the resolved degree/status and the owning client applies the matching Effect Forge outcome exactly once. `automatic` and GM-request modes prefer the selected active GM. Vanishing/disabled emitters clean Presence Effects but do not synthesize a `leave` event. Turn-bound triggers use Foundry v14 combat turn history: the prior combatant receives `turnEnd` processing and the new combatant receives `turnStart` processing, with event claims keyed by stable token/combatant identity so initiative reordering does not replay an already-processed turn. Temporary immunity is persisted as a managed PF2e Effect Item. Its scope key can bind to one aura instance, one source, or one ability key; matching immunity blocks future event occurrences from that aura while it remains active. Immunity granted by one trigger does not retroactively cancel sibling triggers in the same already-started event.
 
 ### Event / Presence ordering contract
 
@@ -100,6 +100,8 @@ If a trigger grants immunity with `blocksPresence: true`, an already active Pres
 
 ## Multi-client ownership
 
+Automatic Actor aura proxy reconciliation follows the same single-writer principle as runtime effects. All clients may observe `ready` or Aura Library changes, but only the Actor's PF2e `primaryUpdater` (or a deterministic active owner/GM fallback) creates, updates, or deletes its managed proxy. Proxy reconciliation compares the desired source with the existing Item first, so an already-current proxy causes zero embedded Item writes.
+
 Coordinate-bearing `updateToken` hooks are treated as transition-capable on every client. Each target Actor is nevertheless mutated by only one client, using PF2e `primaryUpdater` identity by stable User ID rather than object identity; this prevents duplicate effects while allowing player-owned/no-GM sessions to execute their own aura events. Player-request save dialogs are routed over the module socket and therefore do not depend on which client physically moved the token. Remote save reconstruction prefers token-scoped Actors over same-ID world Actors so unlinked/synthetic tokens keep token-specific prepared data. Before creating/removing runtime Effect Items, a narrow compatibility guard normalizes completely missing `system.description` objects on PF2e physical Items; this prevents an unrelated malformed legacy/custom item from crashing the full Actor reset triggered by an embedded-item mutation.
 
 ## Lifecycle
@@ -112,10 +114,14 @@ Coordinate-bearing `updateToken` hooks are treated as transition-capable on ever
 - `updateActor`: reconcile active-scene relationship/instance changes without synthetic transitions.
 - Managed temporary-immunity Item create/update/delete: refresh Presence state without changing occupancy.
 - `updateWorldTime`: refresh Presence state so minute/hour/day fallback expiry can remove stale immunity and restore Presence without token movement.
-- Aura Library setting updates: reconcile current definitions without synthetic transitions.
+- Aura Library setting updates: every client requests Actor-proxy reconciliation, the per-Actor writer performs any needed idempotent proxy sync, and the active scene reconciles current definitions without synthetic transitions.
 - `canvasTearDown`: cancel queued/late reconciliation for the departing canvas, remove Presence Effects belonging to the scene, and clear occupancy state.
 - `deleteCombat`: clear local combat history and runtime event claims so a later Combat run cannot inherit stale deduplication state.
 
 ## Embedded Effect Editor and Effect Engine
 
 Aura Forge continues to use only the public PF2E Critical Forge API. The editor remains embedded UI; persistence and Aura workflow are owned by Aura Forge. Runtime effect application uses the unchanged public `effects.apply()` API.
+
+## Spatial boundary
+
+Aura Forge currently evaluates membership from the source and target token positions at reconciliation time. It does not reconstruct the full movement path, so a token that starts outside, crosses the radius, and finishes outside before reconciliation does not generate synthetic `enter`/`leave` events. Native PF2e wall/sensory aura-square blocking is also outside the current runtime contract. These are explicit feature boundaries rather than accidental event semantics.

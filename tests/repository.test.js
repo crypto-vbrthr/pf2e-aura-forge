@@ -45,3 +45,14 @@ test("repository remove reports whether an aura existed", async () => {
   assert.equal(await repo.remove("aura.one"), true);
   assert.equal(await repo.remove("aura.one"), false);
 });
+
+
+test("repository rejects invalid AuraDefinitions before they enter the library", async () => {
+  const repo = new AuraRepository(memoryStorage());
+  const invalid = createAuraDefinition({ id: "aura.invalid", name: "", radius: 0 });
+  await assert.rejects(
+    () => repo.upsert(invalid),
+    (error) => error?.code === "AURA_DEFINITION_INVALID" && error?.validation?.valid === false
+  );
+  assert.equal((await repo.list()).length, 0);
+});

@@ -218,3 +218,27 @@ test("deleteCombat clears local and runtime combat-event history", () => {
   hooks.call("deleteCombat", combat);
   assert.deepEqual(resets, ["combat-delete"]);
 });
+
+test("library setting changes reconcile Actor aura proxies on every client before scene runtime refresh", async () => {
+  const hooks = new HookBus();
+  const scene = { id: "scene", tokens: { contents: [] } };
+  const calls = [];
+  const runtime = {
+    actorAuras: {
+      async reconcileAll(actors) { calls.push(["proxies", actors.length]); }
+    },
+    async reconcileScene() { calls.push(["scene"]); return {}; },
+    async deactivateScene() {}
+  };
+  registerAuraRuntimeHooks(runtime, {
+    hooks,
+    canvasRef: { scene },
+    gameRef: { actors: { contents: [{ id: "a" }, { id: "b" }] } }
+  });
+
+  hooks.call("updateSetting", { key: "pf2e-aura-forge.auraLibrary" });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  assert.deepEqual(calls[0], ["proxies", 2]);
+  assert.deepEqual(calls[1], ["scene"]);
+});

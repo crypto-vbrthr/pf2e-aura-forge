@@ -728,3 +728,47 @@ test("combat-event deduplication follows token identity when initiative order ch
   assert.equal(report.turnStart, null);
   assert.equal(saveCalls.length, 1);
 });
+
+test("closing a mandatory save dialog falls back to one automatic native save instead of bypassing the aura", async () => {
+  const state = setup({ saveEnter: true, saveDegree: 1 });
+  const { runtime, scene, targetActor, targetToken, calls, saveCalls } = state;
+  targetActor.saves.fortitude.roll = async (options) => {
+    saveCalls.push(options);
+    if (saveCalls.length === 1) return null;
+    return { degreeOfSuccess: 1 };
+  };
+
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  targetToken.x = 200;
+  const report = await runtime.reconcileScene(scene, { fireEvents: true });
+
+  assert.equal(report.transitions.savesCancelled, 1);
+  assert.equal(report.transitions.savesFallback, 1);
+  assert.equal(report.transitions.savesResolved, 1);
+  assert.equal(report.transitions.saveFallbacks[0].initialStatus, "cancelled");
+  assert.equal(saveCalls.length, 2);
+  assert.equal(saveCalls[0].skipDialog, false);
+  assert.equal(saveCalls[1].skipDialog, true);
+  assert.equal(calls.filter((call) => call.definition.id === "enter.failure").length, 1);
+});
+
+test("remote save timeout falls back to a local automatic native save and still resolves the trigger", async () => {
+  const state = setup({ saveEnter: true, saveDegree: 2 });
+  const { runtime, scene, targetToken, calls, saveCalls } = state;
+  runtime.setSocketService({
+    async resolveSave() { return { status: "timeout", degree: null }; }
+  });
+
+  targetToken.x = 500;
+  await runtime.reconcileScene(scene, { seed: true, fireEvents: false });
+  targetToken.x = 200;
+  const report = await runtime.reconcileScene(scene, { fireEvents: true });
+
+  assert.equal(report.transitions.savesFallback, 1);
+  assert.equal(report.transitions.savesResolved, 1);
+  assert.equal(report.transitions.saveFallbacks[0].initialStatus, "timeout");
+  assert.equal(saveCalls.length, 1);
+  assert.equal(saveCalls[0].skipDialog, true);
+  assert.equal(calls.filter((call) => call.definition.id === "enter.effect").length, 1);
+});

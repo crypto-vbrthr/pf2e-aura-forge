@@ -174,6 +174,11 @@ export function registerAuraRuntimeHooks(runtime, {
   on("updateSetting", (setting) => {
     const key = String(setting?.key ?? setting?._source?.key ?? "");
     if (key !== `${MODULE_ID}.${SETTINGS.AURA_LIBRARY}`) return;
+    // Every client observes the world setting update, while ActorAuraService
+    // itself enforces one writer per Actor. This keeps sheet proxies current in
+    // active-GM and no-GM sessions without duplicate embedded Item writes.
+    Promise.resolve(runtime.actorAuras?.reconcileAll?.(gameRef?.actors?.contents ?? []))
+      .catch((error) => console.warn(`${MODULE_ID} | Actor aura proxy reconciliation failed after library update.`, error));
     schedule(currentScene(canvasRef), { fireEvents: false });
   });
   const handleTurnReport = (promise) => {

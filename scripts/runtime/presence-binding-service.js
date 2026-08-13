@@ -1,5 +1,6 @@
 import { EFFECT_FORGE_MODULE_ID, MODULE_ID } from "../constants.js";
 import { repairMalformedPhysicalDescriptions } from "./actor-data-guard.js";
+import { buildRuntimePresenceBindingKey } from "../engine/presence-reconciliation.js";
 
 export const PRESENCE_BINDING_FLAG = "presenceBinding";
 export const PRESENCE_BINDING_METADATA = "auraPresenceBinding";
@@ -36,10 +37,8 @@ export function presenceBindingFlag(item) {
     ?? null;
 }
 
-export function buildRuntimePresenceKey({ sceneId, sourceTokenId, instanceId, presenceEffectId, targetActorUuid }) {
-  return [sceneId, sourceTokenId, instanceId, presenceEffectId, targetActorUuid]
-    .map((value) => String(value ?? ""))
-    .join("::");
+export function buildRuntimePresenceKey(options) {
+  return buildRuntimePresenceBindingKey(options);
 }
 
 export function effectFingerprint(effect) {

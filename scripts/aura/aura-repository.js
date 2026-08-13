@@ -1,6 +1,7 @@
 import { AURA_STORAGE_VERSION } from "../constants.js";
 import { cloneAuraDefinition, createAuraDefinition } from "./aura-definition.js";
 import { migrateAuraDefinition } from "./aura-migrations.js";
+import { validateAuraDefinition } from "./aura-validator.js";
 
 function clone(value) {
   return value == null ? value : structuredClone(value);
@@ -8,6 +9,22 @@ function clone(value) {
 
 export function createEmptyAuraLibrary() {
   return { storageVersion: AURA_STORAGE_VERSION, auras: [] };
+}
+
+export class AuraDefinitionValidationError extends Error {
+  constructor(report) {
+    const details = (report?.errors ?? []).map((entry) => entry.message).join("; ") || "Aura definition is invalid.";
+    super(details);
+    this.name = "AuraDefinitionValidationError";
+    this.code = "AURA_DEFINITION_INVALID";
+    this.validation = report ?? null;
+  }
+}
+
+function assertValidDefinition(definition) {
+  const report = validateAuraDefinition(definition);
+  if (!report.valid) throw new AuraDefinitionValidationError(report);
+  return definition;
 }
 
 export class AuraRepository {
@@ -54,7 +71,7 @@ export class AuraRepository {
 
   async upsert(definition) {
     const library = await this.readLibrary();
-    const normalized = createAuraDefinition(definition);
+    const normalized = assertValidDefinition(createAuraDefinition(definition));
     const index = library.auras.findIndex((entry) => entry.id === normalized.id);
     if (index >= 0) library.auras[index] = normalized;
     else library.auras.push(normalized);

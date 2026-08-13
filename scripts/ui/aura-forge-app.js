@@ -400,8 +400,11 @@ export class AuraForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static async duplicateAura() {
     this.auraEditor.sync();
-    if (!String(this.draft.name ?? "").trim()) {
-      ui.notifications.warn(game.i18n.localize("PF2E_AURA_FORGE.Notifications.NameRequired"));
+    const validation = this.auraEditor.validate();
+    if (!validation.valid) {
+      const details = validation.errors.slice(0, 5).map((entry) => `• ${entry.message}`).join("\n");
+      ui.notifications.error(`${game.i18n.localize("PF2E_AURA_FORGE.Notifications.ValidationFailed")}\n${details}`);
+      await this.#renderPreservingScroll();
       return;
     }
     const copy = cloneAuraDefinition(this.auraEditor.value, {
