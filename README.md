@@ -1,6 +1,6 @@
 # PF2E Aura Forge
 
-Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 0.5.1 completes the **Final Contract & Runtime Hardening** pass on top of the reusable Embedded Aura Editor introduced in 0.5.0.
+Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 1.0.0-rc.1 promotes the hardened 0.5.1 codebase to release-candidate status after the final release review. The public API remains at 0.5.0 and both Aura Definition and Aura Instance schemas remain at version 1.
 
 ## Included
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0-rc.1
+
+### Release Candidate & Final Release Review
+- Promoted the complete 0.5.1 Final Contract & Runtime Hardening build to release-candidate status.
+- No Aura Definition schema, Aura Instance schema, public API, editor contract, or gameplay/runtime semantics changed compared with 0.5.1.
+- Synchronized the Foundry manifest, package metadata, and runtime module version at `1.0.0-rc.1`; the public API remains `0.5.0`.
+- Strengthened the release gate to verify runtime/manifest version alignment, Foundry/PF2e/Critical Forge compatibility metadata, required distribution files, language-file key parity, socket capability, and installable module structure.
+- Re-ran the complete 147-test regression suite plus JavaScript syntax, JSON, and archive-integrity checks for the release-candidate package.
+
 ## 0.5.1
 
 ### Final Contract & Runtime Hardening

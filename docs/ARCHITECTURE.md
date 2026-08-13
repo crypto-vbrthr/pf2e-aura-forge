@@ -45,7 +45,7 @@ Creature Forge / other consumer
 
 `AuraEditorSession` owns the editable `AuraDefinition`, dirty state, validation result, and consumer context. `EmbeddedAuraEditor` owns only Aura-definition editing UI and nested Effect Editor sessions. It deliberately has no Aura Library persistence, Actor assignment, runtime-application, or document-save buttons. The host container decides what happens to `editor.value`.
 
-The public editor contract is `api.ui.auraEditor` with `createSession`, `create`, `render`, `prepareContext`, and `template`. Aura Forge 0.5.1 also hardens the engine contract: `api.engine.planPresenceRuntime()` models the live actor-bound Presence identity directly, while `planPresence()` auto-selects that contract when scene/instance identity is supplied and still accepts the legacy token-bound shape for compatibility.
+The public editor contract is `api.ui.auraEditor` with `createSession`, `create`, `render`, `prepareContext`, and `template`. The 1.0 release candidate retains the hardened 0.5.1 engine contract: `api.engine.planPresenceRuntime()` models the live actor-bound Presence identity directly, while `planPresence()` auto-selects that contract when scene/instance identity is supplied and still accepts the legacy token-bound shape for compatibility.
 
 ## Aura Instance schema v1
 
