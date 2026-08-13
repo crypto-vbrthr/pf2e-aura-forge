@@ -23,6 +23,30 @@ Aura Runtime Engine
 
 Aura Definitions own targeting, presence effects, triggers, saves, temporary immunity policy, and Effect Forge payloads. Aura Instances do not copy those definitions. They reference `definitionId` and hold only Actor-specific state. A managed passive PF2e ability mirrors the aura name/description on the Actor sheet; it contains no runtime authority and is recreated from the instance/definition if missing.
 
+
+## Shared editor layer
+
+```text
+AuraForgeApp (standalone container)
+├── Aura Library browser
+├── Actor assignment / Aura Instances
+├── Save / duplicate / delete
+└── EmbeddedAuraEditor
+    ├── Basic data
+    ├── Targeting
+    ├── Presence Effects
+    │   └── Critical Forge Embedded Effect Editor
+    └── Event triggers
+        └── Critical Forge Embedded Effect Editor
+
+Creature Forge / other consumer
+└── the same EmbeddedAuraEditor
+```
+
+`AuraEditorSession` owns the editable `AuraDefinition`, dirty state, validation result, and consumer context. `EmbeddedAuraEditor` owns only Aura-definition editing UI and nested Effect Editor sessions. It deliberately has no Aura Library persistence, Actor assignment, runtime-application, or document-save buttons. The host container decides what happens to `editor.value`.
+
+The additive public contract is `api.ui.auraEditor` with `createSession`, `create`, `render`, `prepareContext`, and `template`. Existing `api.ui.openAuraForge`, `api.library`, `api.instances`, and `api.engine` contracts are unchanged.
+
 ## Aura Instance schema v1
 
 ```js

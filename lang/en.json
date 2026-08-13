@@ -100,7 +100,8 @@
       "SelectOneToken": "Select exactly one token.",
       "WorldActorRequired": "This step can only assign an aura to a world Actor.",
       "DropActorRequired": "Please drop an actor from the Actor Directory here.",
-      "AssignmentFailed": "The aura could not be assigned to the actor."
+      "AssignmentFailed": "The aura could not be assigned to the actor.",
+      "AuraEditorFailed": "The embedded Aura Editor could not be loaded."
     },
     "Dialogs": {
       "DiscardTitle": "Discard changes?",

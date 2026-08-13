@@ -1,12 +1,14 @@
 # PF2E Aura Forge
 
-Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 0.4.3 is the **Runtime Review & Edge-Case Hardening** release for Presence Effects, enter/leave, turn events, saves, and temporary immunity.
+Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 0.5.0 adds the **Embedded Aura Editor Refactor & Public UI API** while preserving the existing runtime, library, instance, and engine contracts.
 
 ## Included
 
 - Stable Aura Definition schema (`schemaVersion: 1`).
 - Separate `presenceEffects` and discrete event `triggers`.
 - Embedded PF2E Critical Forge Effect Editor for all effect payloads.
+- **One shared embedded Aura Editor surface** for basic data, targeting, Presence Effects, and event triggers. The standalone Aura Forge uses the same component exposed to other modules.
+- **Additive `api.ui.auraEditor` API** with session, mount/render, and context helpers for consumers such as Creature Forge.
 - World-scoped Aura Library with create, edit, duplicate, and delete workflows.
 - Actor-scoped Aura Instances stored as module flags on Actor documents.
 - Drag-and-drop Actor assignment and managed passive PF2e ability proxies on Actor sheets.
@@ -65,6 +67,31 @@ matching Tokens inside range
 The runtime prefers PF2e's Token placeable `distanceTo()` measurement, matching the system's own initial aura range check. A rectangle/grid fallback exists for degraded/test contexts. Presence effects are forced to unlimited global duration because their lifetime is controlled by aura membership, then removed by their exact Aura Forge binding when no longer desired. The binding is inserted into the Effect Definition metadata before Critical Forge creates the PF2e Effect Item, avoiding a second Actor/Item update solely for runtime tagging.
 
 For a trigger **without** a saving throw, the `success` outcome slot is the direct event effect. For a trigger **with** a saving throw, the target Actor's single runtime updater owns the event and routes an owner-facing roll over the module socket when required. The resolver calls the target Actor's native PF2e save statistic and returns the degree before the owning client applies the matching Effect Forge outcome. `turnStart` and `turnEnd` use the same ownership path. Temporary immunities are visible PF2e Effect Items with their configured duration and are checked before a new aura event begins. If one trigger grants immunity, sibling triggers belonging to that same already-started event still resolve; the immunity applies to subsequent events and to the post-event Presence pass.
+
+## Embedded Aura Editor API
+
+The Aura Editor edits only an `AuraDefinition`. It does **not** save to the Aura Library, assign Actors, apply effects immediately, or own any container lifecycle. Those responsibilities stay with the host module. The standalone Aura Forge itself is the reference consumer of this API.
+
+```js
+const auraApi = game.modules.get("pf2e-aura-forge")?.api;
+const definition = await auraApi.library.get("AURA_ID");
+
+const session = auraApi.ui.auraEditor.createSession(definition, {
+  context: { usage: "creature-forge" }
+});
+
+const editor = auraApi.ui.auraEditor.create({
+  session,
+  context: { usage: "creature-forge" },
+  onChange: () => console.log(editor.value)
+});
+
+await editor.mount(containerElement, { layout: "full" });
+const editedAura = editor.value;
+editor.unmount();
+```
+
+`api.ui.openAuraForge()` remains unchanged. Actor assignment and the Aura Library remain container-level features and therefore are intentionally not part of the embedded editor.
 
 ## Public API
 

@@ -12,6 +12,7 @@ import { auraEngineCore } from "../engine/aura-engine-core.js";
 import { ActorAuraService } from "../actor/actor-aura-service.js";
 import { getEffectForgeApi } from "../integration/effect-forge-bridge.js";
 import { AuraRuntimeEngine } from "../runtime/aura-runtime-engine.js";
+import { createAuraEditorUiApi } from "../ui/aura-editor.js";
 
 let runtimeEngine = null;
 
@@ -74,7 +75,8 @@ export function initializePublicApi({ openAuraForge }) {
     }),
 
     ui: Object.freeze({
-      openAuraForge
+      openAuraForge,
+      auraEditor: createAuraEditorUiApi()
     })
   });
 

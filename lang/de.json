@@ -100,7 +100,8 @@
       "SelectOneToken": "Wähle genau einen Token aus.",
       "WorldActorRequired": "Die Aura kann in diesem Schritt nur einem Welt-Actor zugewiesen werden.",
       "DropActorRequired": "Ziehe bitte einen Actor aus dem Actor-Verzeichnis hierher.",
-      "AssignmentFailed": "Die Aura konnte dem Actor nicht zugewiesen werden."
+      "AssignmentFailed": "Die Aura konnte dem Actor nicht zugewiesen werden.",
+      "AuraEditorFailed": "Der eingebettete Aura-Editor konnte nicht geladen werden."
     },
     "Dialogs": {
       "DiscardTitle": "Änderungen verwerfen?",

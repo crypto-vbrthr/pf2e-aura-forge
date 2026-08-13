@@ -35,34 +35,7 @@
     </header>
 
     <div class="aura-forge-scroll" data-aura-fields data-preserve-scroll data-scroll-key="main">
-      <section class="aura-forge-section aura-editor-group group-basic-data">
-        <header class="section-header section-titlebar">
-          <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-sliders"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.BasicData"}}</h2></div></div>
-        </header>
-        <div class="aura-forge-grid two-columns">
-          <label><span>{{localize "PF2E_AURA_FORGE.Name"}}</span><input name="auraName" type="text" value="{{draft.name}}" required></label>
-          <label><span>{{localize "PF2E_AURA_FORGE.Radius"}}</span><input name="auraRadius" type="number" min="1" step="5" value="{{draft.radius}}"></label>
-          <label><span>{{localize "PF2E_AURA_FORGE.AbilityId"}}</span><input name="auraAbilityId" type="text" value="{{draft.abilityId}}"></label>
-          <label class="checkbox-row"><input name="auraEnabled" type="checkbox" {{#if draft.enabled}}checked{{/if}}><span>{{localize "PF2E_AURA_FORGE.Enabled"}}</span></label>
-        </div>
-        <label class="full-width"><span>{{localize "PF2E_AURA_FORGE.Description"}}</span><textarea name="auraDescription" rows="3">{{draft.description}}</textarea></label>
-      </section>
-
-      <section class="aura-forge-section aura-editor-group group-targeting">
-        <header class="section-header section-titlebar">
-          <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-crosshairs"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.Targeting"}}</h2></div></div>
-        </header>
-        <div class="aura-forge-target-grid">
-          <label class="checkbox-row"><input name="target-allies" type="checkbox" {{#if draft.targeting.allies}}checked{{/if}}><span>{{localize "PF2E_AURA_FORGE.Allies"}}</span></label>
-          <label class="checkbox-row"><input name="target-enemies" type="checkbox" {{#if draft.targeting.enemies}}checked{{/if}}><span>{{localize "PF2E_AURA_FORGE.Enemies"}}</span></label>
-          <label class="checkbox-row"><input name="target-neutral" type="checkbox" {{#if draft.targeting.neutral}}checked{{/if}}><span>{{localize "PF2E_AURA_FORGE.Neutral"}}</span></label>
-          <label class="checkbox-row"><input name="target-source" type="checkbox" {{#if draft.targeting.source}}checked{{/if}}><span>{{localize "PF2E_AURA_FORGE.Source"}}</span></label>
-        </div>
-        <div class="aura-forge-grid two-columns">
-          <label><span>{{localize "PF2E_AURA_FORGE.RequiredTraits"}}</span><input name="requiredTraits" type="text" value="{{draft.targeting.requiredTraits}}" placeholder="undead, mental"></label>
-          <label><span>{{localize "PF2E_AURA_FORGE.ExcludedTraits"}}</span><input name="excludedTraits" type="text" value="{{draft.targeting.excludedTraits}}" placeholder="mindless"></label>
-        </div>
-      </section>
+      <div class="aura-editor-host" data-aura-editor-host></div>
 
       <section class="aura-forge-section aura-editor-group group-actor-assignment actor-assignment-section" data-instance-controls>
         <header class="section-header section-titlebar">
@@ -83,7 +56,7 @@
             <i class="fa-solid fa-user-plus"></i>
             <div><strong>{{localize "PF2E_AURA_FORGE.DropActor"}}</strong><span>{{localize "PF2E_AURA_FORGE.DropActorHint"}}</span></div>
           </div>
-          {{#unless canAssign}}<p class="aura-forge-muted"><i class="fa-solid fa-floppy-disk"></i> {{localize "PF2E_AURA_FORGE.SaveBeforeAssignHint"}}</p>{{/unless}}
+          <p class="aura-forge-muted" data-save-before-assign-hint {{#if canAssign}}hidden{{/if}}><i class="fa-solid fa-floppy-disk"></i> {{localize "PF2E_AURA_FORGE.SaveBeforeAssignHint"}}</p>
           {{#if hasAssignments}}
             <div class="actor-assignment-list">
               {{#each assignments as |entry|}}
@@ -106,115 +79,6 @@
         {{/if}}
       </section>
 
-      <section class="aura-forge-section aura-editor-group group-presence-effects">
-        <header class="section-header section-titlebar">
-          <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-circle-nodes"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.PresenceEffects"}}</h2><p>{{localize "PF2E_AURA_FORGE.PresenceEffectsHint"}}</p></div></div>
-          <button type="button" data-action="addPresenceEffect"><i class="fa-solid fa-plus"></i> {{localize "PF2E_AURA_FORGE.AddPresenceEffect"}}</button>
-        </header>
-        <div class="aura-card-list">
-          {{#each presenceEffects as |presence|}}
-            <article class="aura-card" data-presence-id="{{presence.id}}">
-              <div class="aura-card-row">
-                <label class="grow"><span>{{localize "PF2E_AURA_FORGE.Label"}}</span><input name="presenceName" type="text" value="{{presence.name}}"></label>
-                <div class="effect-chip {{#unless presence.hasEffect}}empty{{/unless}}">
-                  <i class="fa-solid fa-wand-magic-sparkles"></i>
-                  {{#if presence.hasEffect}}<span>{{presence.effectName}} · {{presence.componentCount}} {{localize "PF2E_AURA_FORGE.Components"}}</span>{{else}}<span>{{localize "PF2E_AURA_FORGE.NoEffect"}}</span>{{/if}}
-                </div>
-                <button type="button" data-action="editPresenceEffect" data-presence-id="{{presence.id}}"><i class="fa-solid fa-pen"></i> {{localize "PF2E_AURA_FORGE.EditEffect"}}</button>
-                <button type="button" class="danger" data-action="removePresenceEffect" data-presence-id="{{presence.id}}"><i class="fa-solid fa-trash"></i></button>
-              </div>
-              {{#if presence.isEditing}}
-                <div class="embedded-effect-inline pf2e-critical-forge effect-forge-panel" data-embedded-effect-panel>
-                  <header class="embedded-effect-inline-header">
-                    <strong><i class="fa-solid fa-wand-magic-sparkles"></i> {{localize "PF2E_AURA_FORGE.EmbeddedEffectEditor"}}</strong>
-                    <button type="button" data-action="closeEmbeddedEditor"><i class="fa-solid fa-xmark"></i> {{localize "PF2E_AURA_FORGE.CloseEditor"}}</button>
-                  </header>
-                  <div data-embedded-effect-editor></div>
-                </div>
-              {{/if}}
-            </article>
-          {{/each}}
-        </div>
-      </section>
-
-      <section class="aura-forge-section aura-editor-group group-triggers">
-        <header class="section-header section-titlebar">
-          <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-bolt"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.Triggers"}}</h2><p>{{localize "PF2E_AURA_FORGE.TriggersHint"}}</p></div></div>
-          <button type="button" data-action="addTrigger"><i class="fa-solid fa-plus"></i> {{localize "PF2E_AURA_FORGE.AddTrigger"}}</button>
-        </header>
-        <div class="aura-card-list">
-          {{#each triggers as |trigger|}}
-            <article class="aura-card trigger-card" data-trigger-id="{{trigger.id}}">
-              <header class="trigger-header">
-                <label class="grow"><span>{{localize "PF2E_AURA_FORGE.Label"}}</span><input name="triggerName" type="text" value="{{trigger.name}}"></label>
-                <label><span>{{localize "PF2E_AURA_FORGE.Event"}}</span><select name="triggerEvent">{{#each trigger.eventOptions as |option|}}<option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>{{/each}}</select></label>
-                <button type="button" class="danger" data-action="removeTrigger" data-trigger-id="{{trigger.id}}"><i class="fa-solid fa-trash"></i></button>
-              </header>
-
-              <div class="trigger-config-grid">
-                <div class="trigger-config-box">
-                  <label class="checkbox-row"><input name="saveEnabled" type="checkbox" {{#if trigger.save.enabled}}checked{{/if}}><strong>{{localize "PF2E_AURA_FORGE.SavingThrow"}}</strong></label>
-                  <div class="aura-forge-grid three-columns" data-save-config {{#unless trigger.save.enabled}}hidden{{/unless}}>
-                    <label><span>{{localize "PF2E_AURA_FORGE.Type"}}</span><select name="saveType">{{#each trigger.saveTypeOptions as |option|}}<option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>{{/each}}</select></label>
-                    <label><span>{{localize "PF2E_AURA_FORGE.DC"}}</span><input name="saveDc" type="number" min="1" value="{{trigger.save.dc.value}}"></label>
-                    <label><span>{{localize "PF2E_AURA_FORGE.Mode"}}</span><select name="saveMode">{{#each trigger.saveModeOptions as |option|}}<option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>{{/each}}</select></label>
-                  </div>
-                </div>
-
-                <div class="trigger-config-box">
-                  <label class="checkbox-row"><input name="immunityEnabled" type="checkbox" {{#if trigger.immunity.enabled}}checked{{/if}}><strong>{{localize "PF2E_AURA_FORGE.TemporaryImmunity"}}</strong></label>
-                  <div data-immunity-config {{#unless trigger.immunity.enabled}}hidden{{/unless}}>
-                    <div class="aura-forge-grid three-columns">
-                      <label><span>{{localize "PF2E_AURA_FORGE.Duration"}}</span><input name="immunityValue" type="number" min="1" value="{{trigger.immunity.duration.value}}"></label>
-                      <label><span>{{localize "PF2E_AURA_FORGE.Unit"}}</span><select name="immunityUnit"><option value="rounds" {{#if (eq trigger.immunity.duration.unit "rounds")}}selected{{/if}}>{{localize "PF2E_AURA_FORGE.DurationUnits.rounds"}}</option><option value="minutes" {{#if (eq trigger.immunity.duration.unit "minutes")}}selected{{/if}}>{{localize "PF2E_AURA_FORGE.DurationUnits.minutes"}}</option><option value="hours" {{#if (eq trigger.immunity.duration.unit "hours")}}selected{{/if}}>{{localize "PF2E_AURA_FORGE.DurationUnits.hours"}}</option><option value="days" {{#if (eq trigger.immunity.duration.unit "days")}}selected{{/if}}>{{localize "PF2E_AURA_FORGE.DurationUnits.days"}}</option></select></label>
-                      <label><span>{{localize "PF2E_AURA_FORGE.Scope"}}</span><select name="immunityScope">{{#each trigger.immunityScopeOptions as |option|}}<option value="{{option.value}}" {{#if option.selected}}selected{{/if}}>{{option.label}}</option>{{/each}}</select></label>
-                      <label class="checkbox-row immunity-presence-row"><input name="immunityBlocksPresence" type="checkbox" {{#if trigger.immunity.blocksPresence}}checked{{/if}}><span>{{localize "PF2E_AURA_FORGE.ImmunityBlocksPresence"}}</span></label>
-                    </div>
-                    {{#if trigger.hasPresenceEffects}}
-                      <p class="aura-forge-muted immunity-presence-hint" data-immunity-presence-hint {{#unless trigger.presenceInteractionHint}}hidden{{/unless}}><i class="fa-solid fa-circle-info"></i> {{localize "PF2E_AURA_FORGE.ImmunityPresenceInteractionHint"}}</p>
-                    {{/if}}
-                    <div class="degree-checkboxes">{{#each trigger.applyOn as |entry|}}<label class="checkbox-row"><input type="checkbox" data-immunity-degree="{{entry.degree}}" {{#if entry.checked}}checked{{/if}}><span>{{entry.label}}</span></label>{{/each}}</div>
-                  </div>
-                </div>
-              </div>
-
-              {{#unless trigger.save.enabled}}<p class="aura-forge-muted direct-trigger-hint"><i class="fa-solid fa-circle-info"></i> {{localize "PF2E_AURA_FORGE.DirectTriggerHint"}}</p>{{/unless}}
-
-              <div class="outcomes-grid">
-                {{#each trigger.outcomes as |outcome|}}
-                  <div class="outcome-card {{#if outcome.isEditing}}editing{{/if}}">
-                    <strong>{{outcome.label}}</strong>
-                    <span class="effect-chip {{#unless outcome.hasEffect}}empty{{/unless}}">{{#if outcome.hasEffect}}{{outcome.effectName}} · {{outcome.componentCount}} {{localize "PF2E_AURA_FORGE.Components"}}{{else}}{{localize "PF2E_AURA_FORGE.NoEffect"}}{{/if}}</span>
-                    <div class="outcome-actions">
-                      <button type="button" data-action="editOutcomeEffect" data-trigger-id="{{trigger.id}}" data-degree="{{outcome.degree}}"><i class="fa-solid fa-pen"></i></button>
-                      {{#if outcome.hasEffect}}<button type="button" class="danger" data-action="clearOutcomeEffect" data-trigger-id="{{trigger.id}}" data-degree="{{outcome.degree}}"><i class="fa-solid fa-xmark"></i></button>{{/if}}
-                    </div>
-                    {{#if outcome.isEditing}}
-                      <div class="embedded-effect-inline outcome-effect-editor pf2e-critical-forge effect-forge-panel" data-embedded-effect-panel>
-                        <header class="embedded-effect-inline-header">
-                          <strong><i class="fa-solid fa-wand-magic-sparkles"></i> {{outcome.label}}</strong>
-                          <button type="button" data-action="closeEmbeddedEditor"><i class="fa-solid fa-xmark"></i> {{localize "PF2E_AURA_FORGE.CloseEditor"}}</button>
-                        </header>
-                        <div data-embedded-effect-editor></div>
-                      </div>
-                    {{/if}}
-                  </div>
-                {{/each}}
-              </div>
-            </article>
-          {{/each}}
-        </div>
-      </section>
-
-      {{#if validation}}
-        <section class="aura-forge-section aura-editor-group group-validation validation-section">
-          <header class="section-header section-titlebar">
-            <div class="section-heading"><span class="section-heading-icon"><i class="fa-solid fa-triangle-exclamation"></i></span><div><h2>{{localize "PF2E_AURA_FORGE.Validation"}}</h2></div></div>
-          </header>
-          {{#if hasValidationErrors}}<div class="validation-errors">{{#each validation.errors as |entry|}}<p><i class="fa-solid fa-circle-xmark"></i> {{entry.message}} <code>{{entry.path}}</code></p>{{/each}}</div>{{/if}}
-          {{#if hasValidationWarnings}}<div class="validation-warnings">{{#each validation.warnings as |entry|}}<p><i class="fa-solid fa-triangle-exclamation"></i> {{entry.message}} <code>{{entry.path}}</code></p>{{/each}}</div>{{/if}}
-        </section>
-      {{/if}}
     </div>
 
     <footer class="aura-forge-footer">

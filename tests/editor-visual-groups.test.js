@@ -2,19 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const template = await readFile(new URL("../templates/aura-forge-app.hbs", import.meta.url), "utf8");
+const appTemplate = await readFile(new URL("../templates/aura-forge-app.hbs", import.meta.url), "utf8");
+const editorTemplate = await readFile(new URL("../templates/aura-editor.hbs", import.meta.url), "utf8");
 const css = await readFile(new URL("../styles/aura-forge.css", import.meta.url), "utf8");
 
-test("Aura Editor exposes distinct semantic groups for its major domains", () => {
-  for (const className of [
-    "group-basic-data",
-    "group-targeting",
-    "group-actor-assignment",
-    "group-presence-effects",
-    "group-triggers",
-  ]) {
-    assert.match(template, new RegExp(`class="[^"]*${className}[^"]*"`));
+test("Aura Editor and its container expose distinct semantic groups", () => {
+  for (const className of ["group-basic-data", "group-targeting", "group-presence-effects", "group-triggers"]) {
+    assert.match(editorTemplate, new RegExp(`class="[^"]*${className}[^"]*"`));
   }
+  assert.match(appTemplate, /group-actor-assignment/);
+  assert.doesNotMatch(editorTemplate, /group-actor-assignment/);
 });
 
 test("major Aura Editor groups use strong theme-safe framed title rails", () => {
@@ -22,7 +19,6 @@ test("major Aura Editor groups use strong theme-safe framed title rails", () => 
   assert.match(css, /\.aura-editor-group\s*\{[^}]*border:\s*2px\s+solid/s);
   assert.match(css, /\.aura-editor-group\s*\{[^}]*border-left:\s*5px\s+solid\s+var\(--aura-frame-accent/s);
   assert.match(css, /\.aura-editor-group > \.section-titlebar\s*\{[^}]*background:/s);
-  assert.match(css, /\.aura-editor-group > \.section-titlebar/);
   assert.match(css, /\.section-heading-icon\s*\{/);
 });
 
@@ -33,6 +29,6 @@ test("major group framing has concrete fallbacks instead of depending on legacy 
 });
 
 test("visual grouping does not replace the Effect Forge theme scope", () => {
-  assert.match(template, /pf2e-critical-forge effect-forge-panel/);
+  assert.match(editorTemplate, /pf2e-critical-forge effect-forge-panel/);
   assert.doesNotMatch(css, /\.embedded-effect-inline\s*\{[^}]*border-left-color/s);
 });

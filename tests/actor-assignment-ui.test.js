@@ -12,9 +12,11 @@ test("Aura Forge exposes assignment, enable, radius override, and removal contro
   }
 });
 
-test("actor instance controls do not dirty the aura definition draft", () => {
+test("actor instance controls stay outside the shared Aura Editor draft", async () => {
+  const editorTemplate = await readFile(new URL("../templates/aura-editor.hbs", import.meta.url), "utf8");
   assert.match(template, /data-instance-controls/);
-  assert.match(source, /closest\?\.\("\[data-instance-controls\]"\)/);
+  assert.match(template, /data-aura-editor-host/);
+  assert.doesNotMatch(editorTemplate, /data-instance-controls/);
 });
 
 test("Actor Assignment supports directory drag and drop", () => {

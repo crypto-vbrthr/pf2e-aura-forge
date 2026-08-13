@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+### Embedded Aura Editor Refactor & Public UI API
+- Extracted basic data, targeting, Presence Effects, event triggers, validation display, and nested Effect Editor handling into one reusable `EmbeddedAuraEditor`.
+- The standalone Aura Forge now mounts that same editor component instead of owning a second copy of Aura-editing UI logic.
+- Added `AuraEditorSession` for AuraDefinition draft state, dirty tracking, validation, and host-context metadata.
+- Added the additive public `api.ui.auraEditor` contract with `createSession`, `create`, `render`, `prepareContext`, and `template`.
+- Actor assignment, Aura Library persistence, save/duplicate/delete, and runtime behavior remain container-owned and are intentionally excluded from the embedded editor.
+- Existing public library, instance, engine, and `openAuraForge` APIs remain unchanged. API version advanced additively to 0.4.0; Aura schema and instance schemas remain unchanged.
+- Preserved the existing framed Aura Editor design and the nested Critical Forge Effect Editor theme scope in external embedding contexts.
+- Added regression coverage for editor/container separation, public UI API shape, session round-trips, dirty tracking, semantic grouping, and nested Effect Editor theming.
+
 ## 0.4.3
 
 ### Runtime Review & Edge-Case Hardening

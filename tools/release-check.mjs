@@ -11,7 +11,7 @@ if (!moduleJson.relationships?.requires?.some((entry) => entry.id === "pf2e-crit
   throw new Error("PF2E Critical Forge dependency is missing.");
 }
 if (moduleJson.socket !== true) throw new Error("Aura Forge module socket must be enabled.");
-for (const file of ["scripts/main.js", "scripts/runtime/aura-runtime-engine.js", "scripts/runtime/save-resolution-service.js", "scripts/runtime/immunity-service.js", "scripts/runtime/runtime-hooks.js", "scripts/runtime/presence-binding-service.js", "scripts/runtime/runtime-socket-service.js", "scripts/runtime/actor-data-guard.js", "templates/aura-forge-app.hbs", "styles/aura-forge.css", "lang/de.json", "lang/en.json"]) {
+for (const file of ["scripts/main.js", "scripts/runtime/aura-runtime-engine.js", "scripts/runtime/save-resolution-service.js", "scripts/runtime/immunity-service.js", "scripts/runtime/runtime-hooks.js", "scripts/runtime/presence-binding-service.js", "scripts/runtime/runtime-socket-service.js", "scripts/runtime/actor-data-guard.js", "scripts/ui/aura-editor.js", "templates/aura-forge-app.hbs", "templates/aura-editor.hbs", "styles/aura-forge.css", "lang/de.json", "lang/en.json"]) {
   await stat(resolve(root, file));
 }
 console.log(`release-check ok: ${moduleJson.id} ${moduleJson.version}`);

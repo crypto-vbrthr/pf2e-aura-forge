@@ -201,3 +201,25 @@ button.danger { color:var(--color-level-error,#b33); }
   background: color-mix(in srgb, currentColor 5%, transparent);
   border-radius: 3px;
 }
+
+/* Shared Aura Editor component. The standalone Aura Forge and external
+ * consumers mount the same editor tree; containers only provide storage,
+ * assignment, and save/apply controls around it. */
+.aura-editor-host,
+.aura-editor-embedded,
+.aura-editor-embedded-root {
+  min-width: 0;
+  min-height: 0;
+}
+.aura-editor-embedded-root {
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 1rem;
+}
+.aura-editor-embedded[data-aura-editor-layout="compact"] .aura-forge-grid.two-columns,
+.aura-editor-embedded[data-aura-editor-layout="compact"] .aura-forge-grid.three-columns,
+.aura-editor-embedded[data-aura-editor-layout="compact"] .trigger-config-grid,
+.aura-editor-embedded[data-aura-editor-layout="compact"] .outcomes-grid {
+  grid-template-columns: 1fr;
+}
