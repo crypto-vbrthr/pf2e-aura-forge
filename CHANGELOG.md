@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-rc.3
+
+### Actor-local Aura Definitions
+- Added Actor-local Aura Definition snapshots for generated or owned auras. `api.instances.assignDefinition(actor, definition)` now assigns a complete validated AuraDefinition directly to an Actor without adding a one-off entry to the world Aura Library.
+- Added `api.instances.updateDefinition(actor, instanceId, definition)` for editing an Actor-local snapshot in place while preserving the Aura Instance identity. Aura definition ids are immutable after assignment.
+- Aura Instances now record `definitionScope` (`library` or `actor`) plus an optional `definitionSnapshot`; the Aura Instance schema advances from v1 to v2 while Aura Definition schema remains v1. Legacy v1 instances normalize automatically to library scope.
+- Runtime resolution, passive PF2e aura proxies, radius overrides, enable/disable handling, ready reconciliation, and scene reconciliation now work with both library-backed and Actor-local instances.
+- Central library synchronization and deletion intentionally ignore Actor-local snapshots, including the edge case where a local definition id collides with a library definition id.
+- Public API advances additively to 0.6.0 and exposes `instanceSchemaVersion` for integration consumers such as Creature Forge.
+- Added regression coverage for local assignment, snapshot refresh/update, library isolation, id collisions, reconciliation without a library entry, legacy normalization, and update-contract errors.
+
 ## 1.0.0-rc.2
 
 ### Instant Damage & Death integration

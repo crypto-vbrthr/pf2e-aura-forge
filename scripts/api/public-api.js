@@ -1,6 +1,7 @@
 import {
   API_VERSION,
   AURA_SCHEMA_VERSION,
+  AURA_INSTANCE_SCHEMA_VERSION,
   MODULE_ID,
   MODULE_VERSION
 } from "../constants.js";
@@ -48,6 +49,7 @@ export function initializePublicApi({ openAuraForge }) {
     version: API_VERSION,
     moduleVersion: MODULE_VERSION,
     schemaVersion: AURA_SCHEMA_VERSION,
+    instanceSchemaVersion: AURA_INSTANCE_SCHEMA_VERSION,
 
     definitions: Object.freeze({
       create: (overrides = {}) => createAuraDefinition(overrides),
@@ -69,6 +71,8 @@ export function initializePublicApi({ openAuraForge }) {
     instances: Object.freeze({
       list: (actor) => actorAuras.list(actor),
       assign: (actor, definitionId, options = {}) => actorAuras.assign(actor, definitionId, options),
+      assignDefinition: (actor, definition, options = {}) => actorAuras.assignDefinition(actor, validateForStorage(definition), options),
+      updateDefinition: (actor, instanceId, definition) => actorAuras.updateDefinition(actor, instanceId, validateForStorage(definition)),
       remove: (actor, instanceId) => actorAuras.remove(actor, instanceId),
       setEnabled: (actor, instanceId, enabled) => actorAuras.setEnabled(actor, instanceId, enabled),
       setRadiusOverride: (actor, instanceId, value) => actorAuras.setRadiusOverride(actor, instanceId, value),

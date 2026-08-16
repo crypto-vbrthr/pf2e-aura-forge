@@ -1,6 +1,6 @@
 # PF2E Aura Forge
 
-Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 1.0.0-rc.2 extends the release candidate with Critical Forge 1.0.1-rc.3 instant-component integration for one-shot damage and immediate death. The public API remains at 0.5.0 and both Aura Definition and Aura Instance schemas remain at version 1.
+Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 1.0.0-rc.3 adds Actor-local Aura Definition snapshots for generated or owned creature auras without polluting the world Aura Library. The public API is 0.6.0; Aura Definitions remain schema version 1 and Aura Instances advance to schema version 2.
 
 ## Included
 
@@ -10,7 +10,7 @@ Aura Forge is the aura-definition, assignment, and runtime layer for the Forge S
 - **One shared embedded Aura Editor surface** for basic data, targeting, Presence Effects, and event triggers. The standalone Aura Forge uses the same component exposed to other modules.
 - **Additive `api.ui.auraEditor` API** with session, mount/render, and context helpers for consumers such as Creature Forge.
 - World-scoped Aura Library with create, edit, duplicate, and delete workflows.
-- Actor-scoped Aura Instances stored as module flags on Actor documents.
+- Actor-scoped Aura Instances stored as module flags on Actor documents, with either a central-library reference or an Actor-local Aura Definition snapshot.
 - Drag-and-drop Actor assignment and managed passive PF2e ability proxies on Actor sheets.
 - Per-instance enable/disable state and optional radius override.
 - **Live runtime detection for active Aura Instances on scene tokens.**
@@ -28,24 +28,45 @@ Aura Forge is the aura-definition, assignment, and runtime layer for the Forge S
 
 ## Critical Forge requirement
 
-Aura Forge 1.0.0-rc.2 requires **PF2E Critical Forge 1.0.1-rc.3 or newer** and public Effect API **0.9.6 or newer**. This is the first Critical Forge API generation that contains both instant Damage and immediate Death execution.
+Aura Forge 1.0.0-rc.3 requires **PF2E Critical Forge 1.0.1-rc.3 or newer** and public Effect API **0.9.6 or newer**. This is the first Critical Forge API generation that contains both instant Damage and immediate Death execution.
 
 ## Definition vs. instance
 
-Aura Definitions live in the Aura Library. Actor assignments are lightweight instances which reference a definition by ID:
+Aura Instances support two definition scopes.
+
+A normal library-backed assignment stays lightweight and resolves by `definitionId`:
 
 ```js
 {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: "aura-instance....",
   definitionId: "aura....",
   definitionName: "Aura of Dread",
+  definitionScope: "library",
+  definitionSnapshot: null,
   enabled: true,
   overrides: { radius: null }
 }
 ```
 
-Changing the central Aura Definition therefore changes what every assigned Actor resolves to, while instance state and overrides stay Actor-specific. The owned passive ability is only a synchronized sheet-visible representation and never replaces the central definition or instance flag.
+Changing the central Aura Definition changes what every library-backed Actor resolves to, while instance state and overrides stay Actor-specific.
+
+Generated or Actor-owned auras can instead carry a complete local snapshot:
+
+```js
+{
+  schemaVersion: 2,
+  id: "aura-instance....",
+  definitionId: "aura.generated....",
+  definitionName: "Searing Presence",
+  definitionScope: "actor",
+  definitionSnapshot: { /* complete AuraDefinition schema v1 */ },
+  enabled: true,
+  overrides: { radius: null }
+}
+```
+
+Actor-local snapshots are independent of the world Aura Library. Library edits, synchronization, and deletion do not overwrite or remove them. This is the intended integration path for generators such as Creature Forge. The owned passive ability remains only a synchronized sheet-visible representation; runtime semantics resolve from the library definition or the Actor-local snapshot according to `definitionScope`.
 
 
 ### Native PF2e canvas aura
@@ -109,6 +130,21 @@ const aura = await api.library.get("AURA_ID");
 const instance = await api.instances.assign(actor, aura.id);
 await api.instances.setEnabled(actor, instance.id, false);
 await api.instances.setRadiusOverride(actor, instance.id, 20);
+
+// Generated/owned aura: store a validated AuraDefinition snapshot on the Actor
+// without writing it into the central Aura Library.
+const generated = api.definitions.create({
+  name: "Searing Presence",
+  radius: 15
+});
+const localInstance = await api.instances.assignDefinition(actor, generated);
+
+// Actor-local definitions may later be edited in place while keeping the
+// Aura Instance identity stable. The definition id itself is immutable.
+await api.instances.updateDefinition(actor, localInstance.id, {
+  ...generated,
+  radius: 20
+});
 
 await api.engine.reconcileScene(canvas.scene, { fireEvents: false });
 console.log(api.engine.status());

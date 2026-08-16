@@ -1,10 +1,25 @@
 import { MODULE_ID } from "../constants.js";
 import { createAuraInstance, resolveAuraInstance } from "./aura-instance.js";
+import { createAuraDefinition } from "../aura/aura-definition.js";
+import { validateAuraDefinition } from "../aura/aura-validator.js";
 
 export const ACTOR_AURA_FLAG = "auraInstances";
 export const AURA_ABILITY_FLAG = "auraAbility";
 
 function clone(value) { return value == null ? value : structuredClone(value); }
+
+function assertValidLocalDefinition(definition) {
+  const normalized = createAuraDefinition(definition);
+  const report = validateAuraDefinition(normalized);
+  if (!report.valid) {
+    const error = new Error(report.errors.map((entry) => entry.message).join("; ") || "Aura definition is invalid.");
+    error.name = "AuraDefinitionValidationError";
+    error.code = "AURA_DEFINITION_INVALID";
+    error.validation = report;
+    throw error;
+  }
+  return normalized;
+}
 
 function itemList(actor) {
   const items = actor?.items;
@@ -98,8 +113,9 @@ export function createNativeAuraRule(definition, instance) {
 
 /**
  * The owned PF2e ability is deliberately only a sheet-visible proxy. Aura
- * runtime state remains in the lightweight actor flag instance, and the
- * central library remains the source of truth for the aura definition.
+ * runtime state remains in the Actor flag instance. Library-backed instances
+ * resolve against the central Aura Library; Actor-local instances resolve
+ * against their owned definition snapshot.
  */
 export function createAuraAbilitySource(definition, instance) {
   return {
@@ -121,7 +137,8 @@ export function createAuraAbilitySource(definition, instance) {
         [AURA_ABILITY_FLAG]: {
           managed: true,
           instanceId: instance.id,
-          definitionId: instance.definitionId
+          definitionId: instance.definitionId,
+          definitionScope: instance.definitionScope ?? "library"
         }
       }
     }
@@ -184,8 +201,14 @@ export class ActorAuraService {
     };
   }
 
+  async #definitionForInstance(instance) {
+    if (!instance) return null;
+    if (instance.definitionScope === "actor") return clone(instance.definitionSnapshot ?? null);
+    return this.library.get(instance.definitionId);
+  }
+
   async #ensureAbility(actor, instance, definition = null) {
-    definition ??= await this.library.get(instance.definitionId);
+    definition ??= await this.#definitionForInstance(instance);
     if (!definition) return null;
 
     const current = this.#findAbility(actor, instance.id);
@@ -216,19 +239,103 @@ export class ActorAuraService {
     const definition = await this.library.get(definitionId);
     if (!definition) throw new Error(`Unknown aura definition: ${definitionId}`);
     const instances = this.list(actor);
-    const existing = instances.find((x) => x.definitionId === definitionId);
+    const existing = instances.find((x) => x.definitionScope !== "actor" && x.definitionId === definitionId);
     if (existing) {
       await this.#ensureAbility(actor, existing, definition);
       return existing;
     }
 
-    const instance = createAuraInstance({ definitionId, definitionName: definition.name, enabled, overrides });
+    const instance = createAuraInstance({
+      definitionId,
+      definitionName: definition.name,
+      definitionScope: "library",
+      definitionSnapshot: null,
+      enabled,
+      overrides
+    });
     instances.push(instance);
     await this.#write(actor, instances);
     try {
       await this.#ensureAbility(actor, instance, definition);
     } catch (error) {
       await this.#write(actor, instances.filter((x) => x.id !== instance.id));
+      throw error;
+    }
+    return instance;
+  }
+
+  /**
+   * Assign an Actor-local Aura Definition snapshot without adding it to the
+   * world Aura Library. This is intended for generated/owned creature auras.
+   * Reassigning the same local definition id refreshes the existing snapshot.
+   */
+  async assignDefinition(actor, definition, { enabled = true, overrides = {} } = {}) {
+    const normalized = assertValidLocalDefinition(definition);
+    const instances = this.list(actor);
+    const existing = instances.find((x) => x.definitionScope === "actor" && x.definitionId === normalized.id);
+    if (existing) {
+      const previous = clone(existing);
+      existing.definitionName = normalized.name;
+      existing.definitionSnapshot = clone(normalized);
+      await this.#write(actor, instances);
+      try {
+        await this.#ensureAbility(actor, existing, normalized);
+      } catch (error) {
+        const rollback = instances.map((entry) => entry.id === previous.id ? previous : entry);
+        await this.#write(actor, rollback);
+        await this.#ensureAbility(actor, previous, previous.definitionSnapshot);
+        throw error;
+      }
+      return existing;
+    }
+
+    const instance = createAuraInstance({
+      definitionId: normalized.id,
+      definitionName: normalized.name,
+      definitionScope: "actor",
+      definitionSnapshot: normalized,
+      enabled,
+      overrides
+    });
+    instances.push(instance);
+    await this.#write(actor, instances);
+    try {
+      await this.#ensureAbility(actor, instance, normalized);
+    } catch (error) {
+      await this.#write(actor, instances.filter((x) => x.id !== instance.id));
+      throw error;
+    }
+    return instance;
+  }
+
+  /** Update an existing Actor-local Aura Definition snapshot in place. */
+  async updateDefinition(actor, instanceId, definition) {
+    const instances = this.list(actor);
+    const instance = instances.find((entry) => entry.id === instanceId);
+    if (!instance) return null;
+    if (instance.definitionScope !== "actor") {
+      const error = new Error("Only Actor-local aura definitions can be updated through updateDefinition().");
+      error.code = "AURA_INSTANCE_NOT_ACTOR_LOCAL";
+      throw error;
+    }
+
+    const normalized = assertValidLocalDefinition(definition);
+    if (normalized.id !== instance.definitionId) {
+      const error = new Error("Actor-local aura definition id cannot be changed after assignment.");
+      error.code = "AURA_DEFINITION_ID_IMMUTABLE";
+      throw error;
+    }
+
+    const previous = clone(instance);
+    instance.definitionName = normalized.name;
+    instance.definitionSnapshot = clone(normalized);
+    await this.#write(actor, instances);
+    try {
+      await this.#ensureAbility(actor, instance, normalized);
+    } catch (error) {
+      const rollback = instances.map((entry) => entry.id === previous.id ? previous : entry);
+      await this.#write(actor, rollback);
+      await this.#ensureAbility(actor, previous, previous.definitionSnapshot);
       throw error;
     }
     return instance;
@@ -273,15 +380,21 @@ export class ActorAuraService {
   async resolve(actor, instanceId) {
     const instance = this.list(actor).find((x) => x.id === instanceId);
     if (!instance) return null;
-    const definition = await this.library.get(instance.definitionId);
-    return { instance, definition, resolved: resolveAuraInstance(instance, definition), missingDefinition: !definition };
+    const definition = await this.#definitionForInstance(instance);
+    return {
+      instance,
+      definition,
+      resolved: resolveAuraInstance(instance, definition),
+      missingDefinition: !definition,
+      definitionScope: instance.definitionScope ?? "library"
+    };
   }
 
   async assignmentsForDefinition(definitionId, actors = []) {
     const result = [];
     for (const actor of actors) {
       for (const instance of this.list(actor)) {
-        if (instance.definitionId === definitionId) result.push({ actor, instance });
+        if (instance.definitionScope !== "actor" && instance.definitionId === definitionId) result.push({ actor, instance });
       }
     }
     return result;
@@ -299,7 +412,7 @@ export class ActorAuraService {
     let removedOrphans = 0;
 
     for (const instance of instances) {
-      const definition = await this.library.get(instance.definitionId);
+      const definition = await this.#definitionForInstance(instance);
       if (!definition) continue;
       const current = this.#findAbility(actor, instance.id);
       const needsSync = !current || auraAbilityNeedsSync(current, definition, instance);
@@ -343,7 +456,7 @@ export class ActorAuraService {
     for (const actor of actors) {
       if (!canReconcileAuraActor(actor, this.gameRef)) continue;
       for (const instance of this.list(actor)) {
-        if (instance.definitionId !== definitionId) continue;
+        if (instance.definitionScope === "actor" || instance.definitionId !== definitionId) continue;
         const current = this.#findAbility(actor, instance.id);
         if (current && !auraAbilityNeedsSync(current, definition, instance)) continue;
         await this.#ensureAbility(actor, instance, definition);
@@ -357,8 +470,8 @@ export class ActorAuraService {
     let removed = 0;
     for (const actor of actors) {
       const current = this.list(actor);
-      const removedInstances = current.filter((x) => x.definitionId === definitionId);
-      const next = current.filter((x) => x.definitionId !== definitionId);
+      const removedInstances = current.filter((x) => x.definitionScope !== "actor" && x.definitionId === definitionId);
+      const next = current.filter((x) => x.definitionScope === "actor" || x.definitionId !== definitionId);
       removed += removedInstances.length;
       if (next.length !== current.length) {
         await this.#write(actor, next);

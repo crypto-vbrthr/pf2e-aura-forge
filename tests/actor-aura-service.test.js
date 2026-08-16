@@ -257,3 +257,93 @@ test("radius overrides reject zero, negative, and non-finite values", async () =
   const cleared = await service.setRadiusOverride(actor, instance.id, null);
   assert.equal(cleared.overrides.radius, null);
 });
+
+test("assignDefinition stores an Actor-local aura snapshot without touching the central library", async () => {
+  const repo = library([]);
+  const actor = new MockActor("actor.local", "Generated Creature");
+  const service = new ActorAuraService({ library: repo });
+  const aura = createAuraDefinition({ id: "aura.generated", name: "Generated Aura", description: "Actor owned", radius: 20 });
+
+  const instance = await service.assignDefinition(actor, aura);
+
+  assert.equal(instance.definitionScope, "actor");
+  assert.equal(instance.definitionId, aura.id);
+  assert.equal(instance.definitionSnapshot.name, "Generated Aura");
+  assert.equal(repo.map.size, 0);
+  assert.equal(actor.items.length, 1);
+  assert.equal(actor.items[0].name, "Generated Aura");
+  const resolved = await service.resolve(actor, instance.id);
+  assert.equal(resolved.missingDefinition, false);
+  assert.equal(resolved.definitionScope, "actor");
+  assert.equal(resolved.resolved.radius, 20);
+});
+
+test("reassigning and updating an Actor-local definition refreshes its snapshot and passive proxy", async () => {
+  const actor = new MockActor("actor.local-update", "Generated Creature");
+  const service = new ActorAuraService({ library: library([]) });
+  const aura = createAuraDefinition({ id: "aura.generated", name: "First Name", description: "First" });
+  const instance = await service.assignDefinition(actor, aura);
+
+  const reassigned = await service.assignDefinition(actor, { ...aura, name: "Second Name", description: "Second" });
+  assert.equal(reassigned.id, instance.id);
+  assert.equal(service.list(actor).length, 1);
+  assert.equal(auraAbility(actor, instance.id).name, "Second Name");
+
+  const updated = await service.updateDefinition(actor, instance.id, { ...aura, name: "Third Name", description: "Third" });
+  assert.equal(updated.definitionSnapshot.name, "Third Name");
+  assert.equal(auraAbility(actor, instance.id).name, "Third Name");
+  assert.equal(auraAbility(actor, instance.id).system.description.value, "Third");
+});
+
+test("Actor-local definitions survive central library sync and deletion even when ids collide", async () => {
+  const libraryAura = createAuraDefinition({ id: "aura.shared", name: "Library Aura", description: "Central" });
+  const repo = library([libraryAura]);
+  const actor = new MockActor("actor.scope", "Scoped Creature");
+  const service = new ActorAuraService({ library: repo });
+
+  const libraryInstance = await service.assign(actor, libraryAura.id);
+  const localInstance = await service.assignDefinition(actor, { ...libraryAura, name: "Local Aura", description: "Snapshot" });
+  assert.equal(service.list(actor).length, 2);
+
+  repo.set({ ...libraryAura, name: "Updated Library Aura", description: "Updated central" });
+  assert.equal(await service.syncDefinition(libraryAura.id, [actor]), 1);
+  assert.equal(auraAbility(actor, libraryInstance.id).name, "Updated Library Aura");
+  assert.equal(auraAbility(actor, localInstance.id).name, "Local Aura");
+
+  assert.equal(await service.removeDefinitionReferences(libraryAura.id, [actor]), 1);
+  const remaining = service.list(actor);
+  assert.equal(remaining.length, 1);
+  assert.equal(remaining[0].id, localInstance.id);
+  assert.equal(remaining[0].definitionScope, "actor");
+  assert.equal(auraAbility(actor, localInstance.id).name, "Local Aura");
+});
+
+test("reconcileActor restores Actor-local aura proxies without a library definition", async () => {
+  const aura = createAuraDefinition({ id: "aura.local-reconcile", name: "Local Reconcile" });
+  const actor = new MockActor("actor.local-reconcile", "Generated Creature");
+  const service = new ActorAuraService({ library: library([]) });
+  const instance = await service.assignDefinition(actor, aura);
+  actor.items = [];
+
+  const report = await service.reconcileActor(actor);
+  assert.equal(report.synced, 1);
+  assert.equal(actor.items.length, 1);
+  assert.equal(auraAbility(actor, instance.id).name, "Local Reconcile");
+});
+
+test("updateDefinition rejects central-library assignments and identity changes", async () => {
+  const aura = createAuraDefinition({ id: "aura.central", name: "Central" });
+  const actor = new MockActor("actor.contract", "Contract Creature");
+  const service = new ActorAuraService({ library: library([aura]) });
+  const central = await service.assign(actor, aura.id);
+  await assert.rejects(
+    () => service.updateDefinition(actor, central.id, aura),
+    (error) => error?.code === "AURA_INSTANCE_NOT_ACTOR_LOCAL"
+  );
+
+  const local = await service.assignDefinition(actor, createAuraDefinition({ id: "aura.local", name: "Local" }));
+  await assert.rejects(
+    () => service.updateDefinition(actor, local.id, createAuraDefinition({ id: "aura.changed", name: "Changed" })),
+    (error) => error?.code === "AURA_DEFINITION_ID_IMMUTABLE"
+  );
+});

@@ -8,7 +8,9 @@ Aura Library
 
 Actor
 ├── flags.pf2e-aura-forge.auraInstances[]
-│   └── AuraInstance (reference + enabled state + overrides)
+│   └── AuraInstance
+│       ├── library scope → definitionId reference
+│       └── actor scope → owned AuraDefinition snapshot
 └── Item[type=action, actionType=passive]
     └── managed Aura ability proxy for sheet visibility
 
@@ -22,7 +24,7 @@ Aura Runtime Engine
 └── Effect Forge public application API
 ```
 
-Aura Definitions own targeting, presence effects, triggers, saves, temporary immunity policy, and Effect Forge payloads. Aura Instances do not copy those definitions. They reference `definitionId` and hold only Actor-specific state. A managed passive PF2e ability mirrors the aura name/description on the Actor sheet; it contains no runtime authority and is recreated from the instance/definition if missing.
+Aura Definitions own targeting, presence effects, triggers, saves, temporary immunity policy, and Effect Forge payloads. Library-backed Aura Instances reference `definitionId` and hold only Actor-specific state. Actor-local Aura Instances additionally own a complete `definitionSnapshot`, allowing generators such as Creature Forge to attach unique auras without writing one-off definitions into the world Aura Library. A managed passive PF2e ability mirrors the aura name/description on the Actor sheet; it contains no runtime authority and is recreated from the resolved instance/definition if missing.
 
 
 ## Shared editor layer
@@ -48,14 +50,18 @@ Creature Forge / other consumer
 
 The public editor contract is `api.ui.auraEditor` with `createSession`, `create`, `render`, `prepareContext`, and `template`. The 1.0 release candidate retains the hardened 0.5.1 engine contract: `api.engine.planPresenceRuntime()` models the live actor-bound Presence identity directly, while `planPresence()` auto-selects that contract when scene/instance identity is supplied and still accepts the legacy token-bound shape for compatibility.
 
-## Aura Instance schema v1
+## Aura Instance schema v2
+
+Library-backed instance:
 
 ```js
 {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id,
   definitionId,
   definitionName,
+  definitionScope: "library",
+  definitionSnapshot: null,
   enabled,
   overrides: {
     radius: null | number
@@ -63,11 +69,29 @@ The public editor contract is `api.ui.auraEditor` with `createSession`, `create`
 }
 ```
 
-`definitionName` is a display snapshot only. `definitionId` is authoritative.
+Actor-local instance:
+
+```js
+{
+  schemaVersion: 2,
+  id,
+  definitionId,
+  definitionName,
+  definitionScope: "actor",
+  definitionSnapshot: AuraDefinition,
+  enabled,
+  overrides: {
+    radius: null | number
+  }
+}
+```
+
+Legacy schema-v1 instances normalize to `definitionScope: "library"`. `definitionName` remains a display snapshot. For library instances, `definitionId` resolves against the central repository. For Actor-local instances, `definitionId` identifies the owned snapshot and the complete `definitionSnapshot` is authoritative. The public `api.instances.assignDefinition()` and `updateDefinition()` methods are the supported write path for Actor-local definitions.
+
 
 ## Runtime resolution
 
-Each scene token whose Actor owns an enabled Aura Instance becomes an emitter. The current central Aura Definition is resolved and instance overrides are applied without mutating the library object.
+Each scene token whose Actor owns an enabled Aura Instance becomes an emitter. Library-backed instances resolve the current central Aura Definition; Actor-local instances resolve their owned snapshot. Instance overrides are then applied to a clone without mutating either source.
 
 Runtime target classification prefers PF2e Actor relationship helpers (`isAllyOf` / `isEnemyOf`) and uses Actor traits for required/excluded trait filtering. Spatial membership prefers PF2e Token placeable `distanceTo()`, which is also used by the PF2e system as the initial native-aura range test.
 
@@ -123,7 +147,7 @@ Coordinate-bearing `updateToken` hooks are treated as transition-capable on ever
 
 ## Embedded Effect Editor and Effect Engine
 
-Aura Forge continues to use only the public PF2E Critical Forge API. The editor remains embedded UI; persistence and Aura workflow are owned by Aura Forge. Aura Forge 1.0.0-rc.2 requires Critical Forge 1.0.1-rc.3 / Effect API 0.9.6, the public contract that exposes both instant Damage and Death. Event outcomes use `effects.apply(..., { executeInstant: true })`; Presence uses the same API with `executeInstant: false`.
+Aura Forge continues to use only the public PF2E Critical Forge API. The editor remains embedded UI; persistence and Aura workflow are owned by Aura Forge. Aura Forge 1.0.0-rc.3 requires Critical Forge 1.0.1-rc.3 / Effect API 0.9.6, the public contract that exposes both instant Damage and Death. Event outcomes use `effects.apply(..., { executeInstant: true })`; Presence uses the same API with `executeInstant: false`.
 
 ## Spatial boundary
 

@@ -12,8 +12,8 @@ if (moduleJson.version !== packageJson.version) throw new Error("module.json and
 if (moduleJson.version !== MODULE_VERSION) throw new Error("Manifest/package version differs from runtime MODULE_VERSION.");
 if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(moduleJson.version)) throw new Error("Module version is not release-semver shaped.");
 if (!/^\d+\.\d+\.\d+$/.test(API_VERSION)) throw new Error("Public API version is invalid.");
-if (AURA_SCHEMA_VERSION !== 1 || AURA_INSTANCE_SCHEMA_VERSION !== 1) {
-  throw new Error("Release candidate unexpectedly changed Aura schema versions.");
+if (AURA_SCHEMA_VERSION !== 1 || AURA_INSTANCE_SCHEMA_VERSION !== 2) {
+  throw new Error("Release candidate schema versions do not match the documented Aura v1 / Instance v2 contract.");
 }
 if (String(moduleJson.compatibility?.minimum ?? "") !== "14" || String(moduleJson.compatibility?.verified ?? "") !== "14") {
   throw new Error("Foundry v14 compatibility metadata is incomplete.");

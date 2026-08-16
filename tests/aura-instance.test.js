@@ -26,3 +26,16 @@ test("disabled instance disables the resolved aura without altering its template
   assert.equal(resolveAuraInstance(instance, definition).enabled, false);
   assert.equal(definition.enabled, true);
 });
+
+test("legacy instances normalize to library scope while Actor-local snapshots infer actor scope", () => {
+  const legacy = createAuraInstance({ schemaVersion: 1, definitionId: "aura.legacy", definitionName: "Legacy" });
+  assert.equal(legacy.schemaVersion, 2);
+  assert.equal(legacy.definitionScope, "library");
+  assert.equal(legacy.definitionSnapshot, null);
+
+  const definition = createAuraDefinition({ id: "aura.local", name: "Local Aura" });
+  const local = createAuraInstance({ definitionId: definition.id, definitionSnapshot: definition });
+  assert.equal(local.definitionScope, "actor");
+  assert.equal(local.definitionSnapshot.id, definition.id);
+  assert.notEqual(local.definitionSnapshot, definition);
+});

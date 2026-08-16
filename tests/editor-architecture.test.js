@@ -79,3 +79,9 @@ test("duplicate action validates the current embedded Aura draft before writing 
   assert.match(duplicateBody, /repository\.upsert\(copy\)/);
   assert.ok(duplicateBody.indexOf("auraEditor.validate()") < duplicateBody.indexOf("repository.upsert(copy)"));
 });
+
+test("public API exposes Actor-local Aura Definition assignment for generator integrations", () => {
+  assert.match(apiSource, /instanceSchemaVersion:\s*AURA_INSTANCE_SCHEMA_VERSION/);
+  assert.match(apiSource, /assignDefinition:\s*\(actor, definition/);
+  assert.match(apiSource, /updateDefinition:\s*\(actor, instanceId, definition/);
+});

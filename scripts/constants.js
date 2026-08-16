@@ -1,8 +1,8 @@
 export const MODULE_ID = "pf2e-aura-forge";
-export const MODULE_VERSION = "1.0.0-rc.2";
-export const API_VERSION = "0.5.0";
+export const MODULE_VERSION = "1.0.0-rc.3";
+export const API_VERSION = "0.6.0";
 export const AURA_SCHEMA_VERSION = 1;
-export const AURA_INSTANCE_SCHEMA_VERSION = 1;
+export const AURA_INSTANCE_SCHEMA_VERSION = 2;
 export const AURA_STORAGE_VERSION = 1;
 export const EFFECT_FORGE_MODULE_ID = "pf2e-critical-forge";
 export const REQUIRED_EFFECT_API_VERSION = "0.9.6";
