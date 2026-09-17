@@ -1,5 +1,5 @@
 export const MODULE_ID = "pf2e-aura-forge";
-export const MODULE_VERSION = "1.0.0-rc.3";
+export const MODULE_VERSION = "1.0.0-rc.4";
 export const API_VERSION = "0.6.0";
 export const AURA_SCHEMA_VERSION = 1;
 export const AURA_INSTANCE_SCHEMA_VERSION = 2;

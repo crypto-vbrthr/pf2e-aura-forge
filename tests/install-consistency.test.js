@@ -3,10 +3,15 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { MODULE_VERSION } from "../scripts/constants.js";
 
-test("module manifest and compiled module version stay aligned", async () => {
+test("module manifest, package metadata, and runtime version stay aligned", async () => {
   const manifest = JSON.parse(await readFile(new URL("../module.json", import.meta.url), "utf8"));
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   assert.equal(manifest.version, MODULE_VERSION);
+  assert.equal(packageJson.version, MODULE_VERSION);
   assert.equal(manifest.socket, true);
+  if (manifest.download) {
+    assert.match(manifest.download, new RegExp(`/releases/download/${MODULE_VERSION.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`));
+  }
 });
 
 test("ready hook contains a mixed-install fail-fast guard", async () => {

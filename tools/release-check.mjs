@@ -10,6 +10,12 @@ const packageJson = await readJson("package.json");
 if (moduleJson.id !== "pf2e-aura-forge") throw new Error("Unexpected module id.");
 if (moduleJson.version !== packageJson.version) throw new Error("module.json and package.json versions differ.");
 if (moduleJson.version !== MODULE_VERSION) throw new Error("Manifest/package version differs from runtime MODULE_VERSION.");
+if (moduleJson.download) {
+  const releaseMarker = `/releases/download/${moduleJson.version}/`;
+  if (!String(moduleJson.download).includes(releaseMarker)) {
+    throw new Error(`Manifest download URL does not match module version ${moduleJson.version}.`);
+  }
+}
 if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(moduleJson.version)) throw new Error("Module version is not release-semver shaped.");
 if (!/^\d+\.\d+\.\d+$/.test(API_VERSION)) throw new Error("Public API version is invalid.");
 if (AURA_SCHEMA_VERSION !== 1 || AURA_INSTANCE_SCHEMA_VERSION !== 2) {

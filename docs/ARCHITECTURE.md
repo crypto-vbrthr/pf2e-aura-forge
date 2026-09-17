@@ -147,7 +147,7 @@ Coordinate-bearing `updateToken` hooks are treated as transition-capable on ever
 
 ## Embedded Effect Editor and Effect Engine
 
-Aura Forge continues to use only the public PF2E Critical Forge API. The editor remains embedded UI; persistence and Aura workflow are owned by Aura Forge. Aura Forge 1.0.0-rc.3 requires Critical Forge 1.0.1-rc.3 / Effect API 0.9.6, the public contract that exposes both instant Damage and Death. Event outcomes use `effects.apply(..., { executeInstant: true })`; Presence uses the same API with `executeInstant: false`.
+Aura Forge continues to use only the public PF2E Critical Forge API. The editor remains embedded UI; persistence and Aura workflow are owned by Aura Forge. Aura Forge 1.0.0-rc.4 requires Critical Forge 1.0.1-rc.3 / Effect API 0.9.6, the public contract that exposes both instant Damage and Death. Event outcomes use `effects.apply(..., { executeInstant: true })`; Presence uses the same API with `executeInstant: false`.
 
 ## Spatial boundary
 

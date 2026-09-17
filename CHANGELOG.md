@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0-rc.4
+
+### Packaging consistency fix
+- Synchronized `module.json`, `package.json`, and the runtime `MODULE_VERSION` at `1.0.0-rc.4`.
+- Updated current-version documentation references to `1.0.0-rc.4`; no Aura schema, instance schema, public API, editor, or gameplay/runtime behavior changed from rc.3.
+- Strengthened install/release consistency checks so the package version and versioned GitHub download URL are verified against the runtime module version.
+
 ## 1.0.0-rc.3
 
 ### Actor-local Aura Definitions
