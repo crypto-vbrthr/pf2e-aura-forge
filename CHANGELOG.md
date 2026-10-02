@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1
+
+- Promoted Aura Forge to the stable `1.0.1` release version.
+- Synchronized `module.json`, `package.json`, runtime `MODULE_VERSION`, release documentation, and release validation at `1.0.1`.
+- Updated the minimum PF2E Critical Forge dependency to stable `1.0.1`; the required public Effect API remains `0.9.6`.
+- No Aura Definition schema change; Aura Definitions remain schema v1, Aura Instances remain schema v2, and the public Aura Forge API remains `0.6.0`.
+
 ## 1.0.0-rc.4
 
 ### Packaging consistency fix

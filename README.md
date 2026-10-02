@@ -1,6 +1,6 @@
 # PF2E Aura Forge
 
-Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 1.0.0-rc.4 includes Actor-local Aura Definition snapshots for generated or owned creature auras without polluting the world Aura Library. The public API is 0.6.0; Aura Definitions remain schema version 1 and Aura Instances advance to schema version 2.
+Aura Forge is the aura-definition, assignment, and runtime layer for the Forge Suite. Version 1.0.1 includes Actor-local Aura Definition snapshots for generated or owned creature auras without polluting the world Aura Library. The public API is 0.6.0; Aura Definitions remain schema version 1 and Aura Instances advance to schema version 2.
 
 
 ## Part of the Forge Suite
@@ -51,7 +51,7 @@ Suggestions and feature requests are equally welcome. Even small ideas can lead 
 
 ## Critical Forge requirement
 
-Aura Forge 1.0.0-rc.4 requires **PF2E Critical Forge 1.0.1-rc.3 or newer** and public Effect API **0.9.6 or newer**. This is the first Critical Forge API generation that contains both instant Damage and immediate Death execution.
+Aura Forge 1.0.1 requires **PF2E Critical Forge 1.0.1 or newer** and public Effect API **0.9.6 or newer**. This is the first Critical Forge API generation that contains both instant Damage and immediate Death execution.
 
 ## Definition vs. instance
 
